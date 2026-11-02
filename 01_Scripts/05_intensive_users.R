@@ -1,8 +1,7 @@
 # 05_intensive_users.R
 # Exploratory: daily ("almost every day / every day") versus less frequent
 # AI emotional-support use among emotional-support users with daily
-# general AI use (111 vs 295), which restricts the comparison to daily
-# general AI users:
+# general AI use (111 vs 295):
 #   - one adjusted model of age, gender and the M5 psychological,
 #     interpersonal and trauma predictors (the 2 users reporting another
 #     gender, none daily, are excluded: N = 404);
@@ -46,7 +45,7 @@ model_check <- tibble(
 items <- tibble(
   family = rep(c("Helpfulness", "Experiences", "Topics"), c(2, 7, 12)),
   variable = c("help_moderate", "help_a_lot", q04_items, q05_items),
-  label = c("At least moderately helpful", "Helped a lot or a very great deal", unname(item_labels[c(q04_items, q05_items)]))
+  label = unname(item_labels[variable])
 )
 
 compare <- function(v) {

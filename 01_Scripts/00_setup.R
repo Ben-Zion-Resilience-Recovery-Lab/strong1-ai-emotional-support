@@ -28,22 +28,22 @@ analysis_dir <- "02_Analysis_Outputs"
 main_dir <- "03_Main_Outputs"
 supplement_dir <- "04_Supplement"
 
-# Experiences of AI emotional support and topics discussed, asked only of
+# Helpfulness (recoded from MH_AI_Q03), experiences and topics, asked only of
 # emotional-support users.
 q04_items <- sprintf("MH_AI_Q04_R%02d", 0:6)
 q05_items <- sprintf("MH_AI_Q05_R%02d", 1:12)
 item_labels <- setNames(c(
-  "It helped me calm down or cope with distress", "It helped me understand my feelings or gain insight",
-  "I shared things I couldn't tell people", "I used it instead of reaching out to people",
-  "I found myself relying on it repeatedly for comfort",
-  "The responses were inaccurate, unhelpful, or frustrating",
-  "It made me feel worse, more confused, or misunderstood",
+  "At least moderately helpful", "Helped a lot or a very great deal",
+  "Helped calm down or cope with distress", "Helped understand feelings or gain insight",
+  "Shared things I couldn't tell other people", "Used AI instead of reaching out to someone",
+  "Repeatedly relied on AI for comfort", "Responses were inaccurate or unhelpful",
+  "Felt worse, more confused, or misunderstood",
   "Anxiety / worries / panic attacks", "Stress / overload / burnout", "Low mood / depression",
   "Overwhelm or difficulty with emotional regulation", "Sleep difficulties",
   "Loneliness / need for conversation and support", "Interpersonal relationships and conflicts",
   "Trauma, mourning, or difficult memories", "Body image / eating or harmful habits",
   "Personal dilemmas / values / decision making", "Regarding professional help (before / after)", "Other"
-), c(q04_items, q05_items))
+), c("help_moderate", "help_a_lot", q04_items, q05_items))
 
 # All models are logistic regressions fitted with svyglm on an
 # equal-probability design: unweighted estimates with design-based
