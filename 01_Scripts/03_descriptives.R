@@ -73,9 +73,9 @@ item_prevalence <- function(vars, family) {
 }
 
 ai_experiences <- bind_rows(
-  bind_cols(family = "Helpfulness", variable = "MH_AI_Q03", item = "At least moderately helpful",
+  bind_cols(family = "Helpfulness", variable = "MH_AI_Q03", item = item_labels[["help_moderate"]],
             prop_ci(as.integer(users$ai_helpfulness >= 2))),
-  bind_cols(family = "Helpfulness", variable = "MH_AI_Q03", item = "Helped a lot or very great deal",
+  bind_cols(family = "Helpfulness", variable = "MH_AI_Q03", item = item_labels[["help_a_lot"]],
             prop_ci(as.integer(users$ai_helpfulness >= 3))),
   item_prevalence(q04_items, "Experiences"),
   item_prevalence(q05_items, "Topics")
