@@ -584,10 +584,13 @@ secondary <- mod("Secondary_Coefficients")
 secondary_tests <- mod("Secondary_Tests")
 secondary_sample <- mod("Secondary_Sample")
 s3_cols <- c("Predictor", "Estimate", "p")
-s3_or <- function(term, label) {
+s3_or <- function(term, label, type = "regular", digits = 2) {
   r <- secondary[secondary$term == term, ]
-  tibble(row_type = "regular", Predictor = label, Estimate = f_or(r$OR, r$CI_lower, r$CI_upper),
+  tibble(row_type = type, Predictor = label, Estimate = f_or(r$OR, r$CI_lower, r$CI_upper, digits),
          p = fp(r$p_value), p_value = r$p_value)
+}
+s3_categories <- function(heading, prefix, levels) {
+  bind_rows(group_row(heading, s3_cols), map_dfr(levels, ~ s3_or(paste0(prefix, .x), .x, "category")))
 }
 s3_wald <- function(test, label) {
   r <- secondary_tests[secondary_tests$test == test, ]
@@ -595,11 +598,14 @@ s3_wald <- function(test, label) {
          p = fp(r$p_value), p_value = r$p_value)
 }
 tableS3_rows <- bind_rows(
-  section_row("General AI use (reference: a few times)", s3_cols),
-  s3_wald("General AI-use frequency", "Overall test"),
-  s3_or("general_ai_frequencySeveral times a month", "Several times a month"),
-  s3_or("general_ai_frequencySeveral times a week", "Several times a week"),
-  s3_or("general_ai_frequencyAlmost every day / every day", "Almost every day or every day"),
+  section_row("Demographic covariates", s3_cols),
+  s3_or("age", "Age (years)", digits = 3),
+  s3_categories("Gender (reference: female)", "gender", c("Male", "Other")),
+  s3_categories("Education (reference: secondary)", "education",
+                c("Primary", "Post-secondary non-academic", "Bachelor's degree", "Master's degree or higher")),
+  s3_categories("Income (reference: about average)", "income",
+                c("Much below average", "Below average", "Above average", "Much above average")),
+  s3_categories("Religious affiliation (reference: Jewish)", "religion_binary", "Non-Jewish"),
   section_row("Psychological and interpersonal (per SD)", s3_cols),
   s3_or("distress_z", "Psychological distress"),
   s3_or("loneliness_z", "Loneliness"),
@@ -609,7 +615,12 @@ tableS3_rows <- bind_rows(
   s3_or("ace_z", "Childhood adversity (ACE-10)"),
   s3_or("lec_direct_z", "Direct trauma exposure (LEC-5)"),
   s3_or("oct7_z", oct7_label),
-  s3_wald("Trauma exposure (joint)", "Trauma exposure indices, joint test")
+  s3_wald("Trauma exposure (joint)", "Trauma exposure indices, joint test"),
+  section_row("General AI use (reference: a few times)", s3_cols),
+  s3_wald("General AI-use frequency", "Overall test"),
+  s3_or("general_ai_frequencySeveral times a month", "Several times a month"),
+  s3_or("general_ai_frequencySeveral times a week", "Several times a week"),
+  s3_or("general_ai_frequencyAlmost every day / every day", "Almost every day or every day")
 )
 tableS3 <- select(tableS3_rows, all_of(s3_cols))
 
@@ -631,7 +642,8 @@ all_term_labels <- c(
   `general_ai_frequencyAlmost every day / every day` = "General AI use: almost every day or every day (vs. a few times)"
 )
 tableS3_all <- tibble(Predictor = all_term_labels[secondary$term],
-                      `OR [95% CI]` = f_or(secondary$OR, secondary$CI_lower, secondary$CI_upper),
+                      `OR [95% CI]` = f_or(secondary$OR, secondary$CI_lower, secondary$CI_upper,
+                                           if_else(secondary$term == "age", 3, 2)),
                       p = fp(secondary$p_value))
 
 write_table_doc(
@@ -642,8 +654,8 @@ write_table_doc(
          bold_p(3, tableS3_rows$p_value)),
   paste0(
     "n = ", comma(sum(secondary_sample$n)), " participants reporting any general AI use (",
-    comma(sum(secondary_sample$users)), " AI emotional-support users). The model includes all M5 terms plus general ",
-    "AI-use frequency; demographic coefficients are in the supplementary source data. Bold: p<0.05."
+    comma(sum(secondary_sample$users)), " AI emotional-support users). All predictors were entered simultaneously ",
+    "(M5 plus general AI-use frequency). Bold: p<0.05."
   )
 )
 
@@ -700,14 +712,13 @@ write_table_doc(
              n_daily, " daily, ", n_less, " less frequent)"))
   ),
   paste0(
-    "Daily = almost every day or every day. Both analyses are restricted to emotional-support users with daily ",
-    "general AI use, retaining ", n_daily, " of the ",
-    sum(group_sizes$n[group_sizes$daily == 1]), " daily emotional-support users. A: age, gender, and all M5 ",
-    "psychological, interpersonal, and trauma predictors; the ", check_value("Excluded: gender 'Other' (none daily)"),
-    " users reporting another gender (none daily) are excluded; c-statistic = ", f2(check_value("c-statistic")),
-    ". B: differences are daily minus less frequent, in percentage points (pp), with Wald 95% CIs not adjusted for ",
-    "multiplicity. p values are from Fisher's exact tests, Holm-adjusted within each item family (helpfulness, 2 ",
-    "items; experiences, 7; topics, 12). Bold: p<0.05."
+    "Daily = almost every day or every day. Sample: emotional-support users with daily general AI use (", n_daily,
+    " of ", sum(group_sizes$n[group_sizes$daily == 1]), " daily emotional-support users retained). A: adjusted for ",
+    "age, gender, and all M5 psychological, interpersonal, and trauma predictors; excludes ",
+    check_value("Excluded: gender 'Other' (none daily)"), " users reporting another gender (none daily); ",
+    "c-statistic = ", f2(check_value("c-statistic")), ". B: differences (daily minus less frequent) in percentage ",
+    "points (pp) with Wald 95% CIs not adjusted for multiplicity; p values from Fisher's exact tests, Holm-adjusted ",
+    "within item family (helpfulness, 2 items; experiences, 7; topics, 12). Bold: p<0.05."
   )
 )
 
