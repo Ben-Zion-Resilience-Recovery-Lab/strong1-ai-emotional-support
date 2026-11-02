@@ -654,8 +654,8 @@ write_table_doc(
          bold_p(3, tableS3_rows$p_value)),
   paste0(
     "n = ", comma(sum(secondary_sample$n)), " participants reporting any general AI use (",
-    comma(sum(secondary_sample$users)), " AI emotional-support users). All predictors were entered simultaneously ",
-    "(M5 plus general AI-use frequency). Bold: p<0.05."
+    comma(sum(secondary_sample$users)), " AI emotional-support users). All predictors were entered simultaneously. ",
+    "Bold indicates p < .05."
   )
 )
 
