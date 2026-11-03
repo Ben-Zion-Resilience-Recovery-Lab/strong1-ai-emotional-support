@@ -43,19 +43,20 @@ Each script runs in its own R process, in order, and the pipeline stops at the f
 | --- | --- | --- |
 | `00_setup.R` | Paths, packages and the model helpers; sourced by every script | |
 | `01_prepare_data.R` | Variable selection, response-code checks, scoring and derived variables | `data/STRONG1_T1_analysis_data.rds` |
-| `02_data_checks.R` | QC flow, item codes and scale scores, reliability, routing, analytic samples, missingness | `Data_Checks.xlsx` |
+| `02_data_checks.R` | QC flow, item codes and scale scores, LEC-5 direct exposure, reliability, routing, analytic samples, missingness | `Data_Checks.xlsx` |
 | `03_descriptives.R` | Prevalence and frequency of AI use, Table 1 summaries, experiences and topics | `Descriptives.xlsx` |
 | `04_models.R` | Hierarchical models M1–M5, secondary model, sensitivity analyses | `Models.xlsx` |
 | `05_intensive_users.R` | Daily vs less frequent users: adjusted model and 21 Holm-corrected comparisons | `Intensive_Users.xlsx` |
 | `06_tables_figures.R` | Publication tables and figures, built only from the workbooks of 03–05 | Tables, figures, source data |
 
-`02_data_checks.R` stops if the audited QC counts, scale scores, routing or analytic sample sizes are not reproduced.
+`02_data_checks.R` stops if the audited QC counts, scale scores, LEC-5 direct-exposure checks, routing or analytic sample sizes are not reproduced.
 
 ## Analysis notes
 
 - All estimates are unweighted (`TemporaryWeights` is a placeholder of 1s). Models are logistic regressions fitted with `survey::svyglm` on an equal-probability design, giving design-based standard errors and Wald tests. Age is per year; other continuous predictors are per sample SD.
 - The models use the 3,600 complete cases; the two excluded participants lack only a loneliness score (UCLA-3 not computable).
 - The 533 participants who reported no index trauma were routed past the PCL-5 and are scored 0 (532 in the model sample); a sensitivity analysis excludes them.
+- LEC-5 direct exposure (0–15) is calculated from the items: "Happened to me" responses (code 1) on items 1–13 and 16–17. Items 14–15 (sudden violent death; in the administered Hebrew and Arabic versions, sudden unexpected death of a close person) are classified as indirect for every response; "Not sure" and "Did not happen to me" are non-exposure. The supplied `LEC5_Direct_Score` counts all 17 items and is retained only for comparison in `Data_Checks.xlsx`.
 - The October 7 and war-related exposure index is the STRONG team's 14-item count, including relocation during the Iran war.
 
 ## Outputs

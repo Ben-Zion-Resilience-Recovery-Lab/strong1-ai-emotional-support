@@ -27,7 +27,7 @@ source_vars <- c(
   sprintf("MOSSS_Q%02d", 1:8), "MOSSS_Score",
   # TraumaRank is the PCL-5 index event and routing item
   "TraumaRank", sprintf("PCL_Q%02d", 1:20), "PCL_Total_Score",
-  sprintf("ACE_Q%02d", 1:10), "ACE_Score", sprintf("LEC5_Q%02d", 1:17), "LEC5_Direct_Score",
+  sprintf("ACE_Q%02d", 1:10), "ACE_Score", lec_items, "LEC5_Direct_Score",
   sprintf("Oct7_Exposures_R%02d", 0:9), "Oct7_Evacuation", "Oct7_Videos",
   sprintf("Oct7_Family_Q01_R%02d", 0:5), "Army_Y_N", "Iran_Q01"
 )
@@ -37,6 +37,7 @@ coded_vars <- c("Gender", "Education", "Income", "Religiosity_Q01", "MH_AI_Q01",
 allowed_codes <- c(
   setNames(list(1:3, 1:5, 1:5, 1:6, 0:4, 0:4, 0:4, 0:3, 0:4, 0:2, 0:1), coded_vars),
   list(UCLA_Loneliness_Score = c(-97, 3:9)),  # -97: not computable (an item is missing)
+  setNames(rep(list(0:5), length(lec_items)), lec_items),
   setNames(rep(list(0:1), 28), c(q04_items, q05_items, sprintf("Oct7_Exposures_R%02d", c(1:4, 7)),
                                  sprintf("Oct7_Family_Q01_R%02d", 1:4)))
 )
@@ -51,6 +52,10 @@ value_labels <- map_dfr(coded_vars, function(v) {
     filter(!is.na(code)) %>%
     count(variable, code, label, name = "n")
 })
+value_labels <- map_dfr(lec_items, ~ tibble(code = values[[.x]], label = as.character(labels[[.x]]))) %>%
+  filter(!is.na(code)) %>%
+  count(variable = "LEC5_Q01-Q17", code, label, name = "n") %>%
+  bind_rows(value_labels, .)
 
 standardize <- function(x) (x - mean(x, na.rm = TRUE)) / sd(x, na.rm = TRUE)
 frequency_labels <- c("Not at all", "A few times", "Several times a month",
@@ -86,7 +91,9 @@ participants <- values %>%
     ai_helpfulness = MH_AI_Q03,
 
     ace = ACE_Score,                 # childhood adversity to age 18
-    lec_direct = LEC5_Direct_Score,  # event types experienced directly ("not sure" excluded)
+    # Event types that happened to the participant, without items 14-15. The
+    # supplied LEC5_Direct_Score counts all 17 items and is kept for comparison.
+    lec_direct = rowSums(across(all_of(lec_direct_items)) == 1),
     # The STRONG team's 14-item October 7 index, unmodified: evacuation is
     # nested (still displaced scores 2) and one item is relocation during
     # the Iran war.

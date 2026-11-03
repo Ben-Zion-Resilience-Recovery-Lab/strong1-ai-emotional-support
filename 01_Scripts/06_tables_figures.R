@@ -227,7 +227,7 @@ table1_rows <- bind_rows(
   section_row("PTSD symptoms and trauma exposure", t1_cols),
   t1_continuous("pcl", "PTSD symptoms (PCL-5, 0–80)"),
   t1_continuous("ace", "Childhood adversity (ACE-10, 0–10)"),
-  t1_continuous("lec_direct", "Direct trauma exposure (LEC-5, 0–17)"),
+  t1_continuous("lec_direct", "Direct trauma exposure (LEC-5, 0–15)"),
   t1_continuous("oct7_total_14", oct7_label)
 )
 table1 <- select(table1_rows, -row_type)
@@ -251,7 +251,8 @@ write_table_doc(
   paste0(
     "Values are M (SD) or n (%). Non-users reported no AI emotional-support use in the past 3 months. ",
     "Psychological distress is the standardized mean of the PHQ-9, GAD-7, and PSS-10 z scores. The 533 ",
-    "participants who reported no index trauma were not administered the PCL-5 and are scored 0. Loneliness was ",
+    "participants who reported no index trauma were not administered the PCL-5 and are scored 0. ",
+    "The direct LEC-5 count excludes items 14–15, which were classified as indirect exposure. Loneliness was ",
     "missing for ", loneliness_missing[["Overall"]], " participants (both non-users); all other characteristics were complete."
   )
 )

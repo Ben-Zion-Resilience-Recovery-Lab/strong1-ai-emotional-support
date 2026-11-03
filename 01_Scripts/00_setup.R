@@ -32,6 +32,13 @@ supplement_dir <- "04_Supplement"
 # emotional-support users.
 q04_items <- sprintf("MH_AI_Q04_R%02d", 0:6)
 q05_items <- sprintf("MH_AI_Q05_R%02d", 1:12)
+# LEC-5 items, one response per item (0 = did not happen to me, 1 = happened to
+# me, 2 = witnessed, 3 = heard from a first-hand source, 4 = part of my job,
+# 5 = not sure). Items 14-15 (sudden violent death; in Hebrew and Arabic, sudden
+# unexpected death of a close person) are indirect whatever the response, so
+# direct exposure is counted on the other 15 items.
+lec_items <- sprintf("LEC5_Q%02d", 1:17)
+lec_direct_items <- setdiff(lec_items, c("LEC5_Q14", "LEC5_Q15"))
 item_labels <- setNames(c(
   "At least moderately helpful", "Helped a lot or a very great deal",
   "Helped calm down or cope with distress", "Helped understand feelings or gain insight",
