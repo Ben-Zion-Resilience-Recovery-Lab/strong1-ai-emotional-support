@@ -201,6 +201,40 @@ if (!identical(sample_flow$n, as.integer(audited_samples)) ||
   stop("Analytic samples do not reproduce the audited counts.")
 }
 
+# Sector: Arab = Muslim, Christian or Druze; every other affiliation (Jewish,
+# atheist or no religion, other) is in the comparison group.
+sector_coding <- count(d, religion, sector, name = "n_retained") %>%
+  left_join(count(filter(d, model_sample), religion, name = "n_model_sample"), by = "religion")
+if (!all(d$sector[d$religion %in% c("Muslim", "Christian", "Druze")] == "Arab") ||
+    !all(d$sector[!d$religion %in% c("Muslim", "Christian", "Druze")] == "Jewish, other or no religion") ||
+    anyNA(d$sector) || sum(d$sector == "Arab") != 210 || sum(d$sector[d$model_sample] == "Arab") != 209) {
+  stop("Sector coding does not reproduce the audited counts.")
+}
+
+# October 7 and war-related exposure: the 14 indicators of the STRONG
+# index (documented in Supplementary Methods S2) must sum to oct7_total_14.
+oct7_indicators <- tibble(
+  indicator = c("Under missile attack", "Missile struck nearby", "In the Gaza border area on October 7",
+                "In great danger", "Injured", "Evacuated from home", "Still displaced (evacuated or living elsewhere)",
+                "Viewed graphic footage (any)", "Military service (reserve or regular)", "Relocated during the Iran war",
+                "Family member or close friend in great danger", "Family member or close friend injured",
+                "Family member or close friend killed", "Family member or close friend kidnapped"),
+  source = c(sprintf("Oct7_Exposures_R%02d", c(1:4, 7)), "Oct7_Evacuation", "Oct7_Evacuation", "Oct7_Videos",
+             "Army_Y_N", "Iran_Q01", sprintf("Oct7_Family_Q01_R%02d", 1:4)),
+  coding = c(rep("1 = selected", 5), "codes 1-3", "codes 1-2", "codes 1-4 (any number of videos)",
+             "codes 1-2", "1 = yes", rep("1 = selected", 4))
+)
+oct7_matrix <- cbind(
+  as.matrix(d[sprintf("Oct7_Exposures_R%02d", c(1:4, 7))]),
+  d$Oct7_Evacuation %in% 1:3, d$Oct7_Evacuation %in% 1:2, d$Oct7_Videos %in% 1:4,
+  d$Army_Y_N %in% 1:2, d$Iran_Q01 == 1,
+  as.matrix(d[sprintf("Oct7_Family_Q01_R%02d", 1:4)])
+)
+oct7_indicators <- mutate(oct7_indicators, n = colSums(oct7_matrix), pct = 100 * n / nrow(d))
+if (ncol(oct7_matrix) != 14 || anyNA(oct7_matrix) || !all(rowSums(oct7_matrix) == d$oct7_total_14)) {
+  stop("The 14 October 7 indicators do not reproduce the exposure index.")
+}
+
 # Missing values other than the follow-up items skipped by design.
 missingness <- tibble(variable = names(d), n_missing = colSums(is.na(d))) %>%
   filter(n_missing > 0, !variable %in% c(follow_ups, "ai_helpfulness", "ai_support_daily"))
@@ -219,6 +253,8 @@ write_analysis(
     Reliability = reliability,
     Response_Coding = data$value_labels,
     Sample_Flow = sample_flow,
+    Sector_Coding = sector_coding,
+    Oct7_Indicators = oct7_indicators,
     Missingness = missingness
   ),
   "Data_Checks.xlsx"
