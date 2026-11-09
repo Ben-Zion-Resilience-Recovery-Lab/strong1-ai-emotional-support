@@ -97,7 +97,8 @@ p <- ggplot(plot_cells, aes(age_group, pct, colour = ace_group, group = ace_grou
   theme_classic(base_size = 10, base_family = "Helvetica") +
   theme(legend.position = "top", legend.justification = "left", legend.title = element_text(size = 9),
         axis.text = element_text(colour = "black"), panel.grid.major.y = element_line(colour = "grey90", linewidth = 0.3))
-for (ext in c("pdf", "png")) {
-  ggsave(file.path(out_dir, "figures", paste0("Candidate_Figure_ACE_by_Age.", ext)), p,
-         width = 6.3, height = 3.8, dpi = 300, device = if (ext == "pdf") cairo_pdf else "png")
-}
+# Quartz on macOS (cairo_pdf needs XQuartz there), Cairo elsewhere; both embed
+# fonts and keep the en dashes. Superseded by Figure 3 in 06_tables_figures.R.
+pdf_device <- if (capabilities("aqua")) function(filename, ...) grDevices::quartz(file = filename, type = "pdf", ...) else grDevices::cairo_pdf
+ggsave(file.path(out_dir, "figures", "Candidate_Figure_ACE_by_Age.pdf"), p, width = 6.3, height = 3.8, device = pdf_device)
+ggsave(file.path(out_dir, "figures", "Candidate_Figure_ACE_by_Age.png"), p, width = 6.3, height = 3.8, dpi = 300)
