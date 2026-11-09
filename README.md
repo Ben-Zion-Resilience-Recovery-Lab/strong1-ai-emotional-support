@@ -57,6 +57,7 @@ Each script runs in its own R process, in order, and the pipeline stops at the f
 - The models use the 3,600 complete cases; the two excluded participants lack only a loneliness score (UCLA-3 not computable).
 - The 533 participants who reported no index trauma were routed past the PCL-5 and are scored 0 (532 in the model sample); a sensitivity analysis excludes them.
 - LEC-5 direct exposure (0–15) is calculated from the items: "Happened to me" responses (code 1) on items 1–13 and 16–17. Items 14–15 (sudden violent death; in the administered Hebrew and Arabic versions, sudden unexpected death of a close person) are classified as indirect for every response; "Not sure" and "Did not happen to me" are non-exposure. The supplied `LEC5_Direct_Score` counts all 17 items and is retained only for comparison in `Data_Checks.xlsx`.
+- Sector (M1 covariate) is coded Arab (Muslim, Christian or Druze; 210 retained, 209 in the model sample) versus a comparison group of Jewish, other religion and no religion (3,392; 3,391). Participants reporting another religion or no religion (32) were in the non-Jewish group before 9 November 2026.
 - The October 7 and war-related exposure index is the STRONG team's 14-item count, including relocation during the Iran war.
 
 ## Outputs

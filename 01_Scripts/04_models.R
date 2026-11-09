@@ -17,7 +17,7 @@ source("01_Scripts/00_setup.R")
 primary_dat <- filter(readRDS(analysis_file)$participants, model_sample)
 
 blocks <- list(
-  M1 = c("age", "gender", "education", "income", "religion_binary"),
+  M1 = c("age", "gender", "education", "income", "sector"),
   M2 = "distress_z",
   M3 = c("loneliness_z", "social_support_z"),
   M4 = "pcl_z",

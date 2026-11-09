@@ -65,7 +65,7 @@ participants <- values %>%
   select(all_of(source_vars)) %>%
   mutate(
     # Model reference categories: female, secondary education,
-    # about-average income, Jewish.
+    # about-average income, Jewish/other/no religion sector.
     age = Age,
     gender = factor(Gender, 1:3, c("Female", "Male", "Other")),
     education = relevel(factor(Education, 1:5, c("Primary", "Secondary", "Post-secondary non-academic",
@@ -74,7 +74,11 @@ participants <- values %>%
                                            "Above average", "Much above average")), "About average"),
     religion = factor(Religiosity_Q01, 1:6, c("Jewish", "Muslim", "Christian", "Druze",
                                               "Atheist / no religion", "Other")),
-    religion_binary = factor(if_else(Religiosity_Q01 == 1, "Jewish", "Non-Jewish"), c("Jewish", "Non-Jewish")),
+    # Sector (the model covariate): Arab = Muslim, Christian or Druze (codes
+    # 2-4); the comparison group is Jewish, other religion or no religion
+    # (codes 1, 5, 6).
+    sector = factor(if_else(Religiosity_Q01 %in% 2:4, "Arab", "Jewish, other or no religion"),
+                    c("Jewish, other or no religion", "Arab")),
 
     phq = PHQ_Score, gad = GAD_Score, pss = PSS_Score,
     loneliness = na_if(UCLA_Loneliness_Score, -97),
@@ -116,7 +120,7 @@ participants <- values %>%
     distress_z = standardize((phq_z + gad_z + pss_z) / 3),
 
     # Complete cases on every M1-M5 variable: the hierarchical-model sample.
-    model_sample = complete.cases(age, gender, education, income, religion_binary, distress_z,
+    model_sample = complete.cases(age, gender, education, income, sector, distress_z,
                                   loneliness_z, social_support_z, pcl_z, ace_z, lec_direct_z, oct7_z)
   )
 

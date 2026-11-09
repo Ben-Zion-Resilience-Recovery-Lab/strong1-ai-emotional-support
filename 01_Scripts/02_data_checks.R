@@ -201,6 +201,16 @@ if (!identical(sample_flow$n, as.integer(audited_samples)) ||
   stop("Analytic samples do not reproduce the audited counts.")
 }
 
+# Sector: Arab = Muslim, Christian or Druze; every other affiliation (Jewish,
+# atheist or no religion, other) is in the comparison group.
+sector_coding <- count(d, religion, sector, name = "n_retained") %>%
+  left_join(count(filter(d, model_sample), religion, name = "n_model_sample"), by = "religion")
+if (!all(d$sector[d$religion %in% c("Muslim", "Christian", "Druze")] == "Arab") ||
+    !all(d$sector[!d$religion %in% c("Muslim", "Christian", "Druze")] == "Jewish, other or no religion") ||
+    anyNA(d$sector) || sum(d$sector == "Arab") != 210 || sum(d$sector[d$model_sample] == "Arab") != 209) {
+  stop("Sector coding does not reproduce the audited counts.")
+}
+
 # Missing values other than the follow-up items skipped by design.
 missingness <- tibble(variable = names(d), n_missing = colSums(is.na(d))) %>%
   filter(n_missing > 0, !variable %in% c(follow_ups, "ai_helpfulness", "ai_support_daily"))
@@ -219,6 +229,7 @@ write_analysis(
     Reliability = reliability,
     Response_Coding = data$value_labels,
     Sample_Flow = sample_flow,
+    Sector_Coding = sector_coding,
     Missingness = missingness
   ),
   "Data_Checks.xlsx"
