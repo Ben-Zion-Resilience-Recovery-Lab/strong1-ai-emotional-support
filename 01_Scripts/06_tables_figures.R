@@ -1,7 +1,7 @@
 # 06_tables_figures.R
 # Publication outputs, built only from the aggregate workbooks written by
-# scripts 03-05: Tables 1-2 and Figures 1-2 (main), Tables S1-S4
-# (supplement), and a source-data workbook for each.
+# scripts 03-05 and 07-09: Tables 1-2 and Figures 1-3 (main), Tables S1-S5
+# (supplement), and a source-data workbook for each. Run after 07-09.
 
 source("01_Scripts/00_setup.R")
 suppressPackageStartupMessages({
@@ -16,6 +16,7 @@ read_result <- function(file, sheet) read_excel(file.path(analysis_dir, file), s
 desc <- function(sheet) read_result("Descriptives.xlsx", sheet)
 mod <- function(sheet) read_result("Models.xlsx", sheet)
 intensive <- function(sheet) read_result("Intensive_Users.xlsx", sheet)
+round_b <- function(file, sheet) read_result(file.path("Round_B", file), sheet)
 
 for (d in c(file.path(main_dir, c("tables", "figures/previews", "source_data")),
             file.path(supplement_dir, c("tables", "source_data")))) {
@@ -58,7 +59,7 @@ f_ci1 <- function(est, lo, hi) {
 # categorical variable's heading, with its reference category),
 # "category" (indented under its group) and "regular".
 
-pub_table <- function(data, widths, align, size, row_type = NULL) {
+pub_table <- function(data, widths, align, size, row_type = NULL, group_span = length(widths)) {
   row_type <- row_type %||% rep("regular", nrow(data))
   ft <- flextable(data) %>%
     theme_booktabs() %>%
@@ -77,12 +78,17 @@ pub_table <- function(data, widths, align, size, row_type = NULL) {
   ft <- align(ft, j = 1, align = "left", part = "header")
   sections <- which(row_type == "section")
   groups <- which(row_type == "group")
-  for (i in c(sections, groups)) ft <- merge_at(ft, i = i, j = seq_along(widths), part = "body")
+  for (i in sections) ft <- merge_at(ft, i = i, j = seq_along(widths), part = "body")
+  for (i in groups) ft <- merge_at(ft, i = i, j = seq_len(group_span), part = "body")
   if (length(sections) > 0) {
     ft <- ft %>% bg(i = sections, bg = "#E9EFF5", part = "body") %>% bold(i = sections, part = "body") %>%
       align(i = sections, j = 1, align = "left", part = "body")
   }
   if (length(groups) > 0) ft <- ft %>% italic(i = groups, part = "body") %>% align(i = groups, j = 1, align = "left", part = "body")
+  # Statistics on a group heading row (beyond group_span) stay upright.
+  if (length(groups) > 0 && group_span < length(widths)) {
+    ft <- italic(ft, i = groups, j = (group_span + 1):length(widths), italic = FALSE, part = "body")
+  }
   categories <- which(row_type == "category")
   if (length(categories) > 0) ft <- padding(ft, i = categories, j = 1, padding.left = 16, part = "body")
   ft
@@ -96,9 +102,11 @@ bold_p <- function(ft, j, p) {
 }
 
 # APA 7 italics for statistical symbols in table cells, panel titles
-# and notes: N, n, M, SD, OR, F, p, c (c-statistic) and z (z score);
-# a plural "s" stays upright.
-stat_symbol <- "(?<![[:alnum:]])(N|n|M|SD|OR|F|p)(?=s?(?![[:alnum:]]))|(?<![[:alnum:]])c(?=[-\u2011]statistic)|(?<![[:alnum:]])z(?= scores?)"
+# and notes: N, n, M, SD, OR, F, p, c (c-statistic), z (z score), t and
+# chi-square, and Hedges' g and Cramer's V; a plural "s" stays upright.
+stat_symbol <- paste0("(?<![[:alnum:]])(N|n|M|SD|OR|F|p)(?=s?(?![[:alnum:]]))|(?<![[:alnum:]])c(?=[-\u2011]statistic)|",
+                      "(?<![[:alnum:]])z(?= scores?)|(?<![[:alnum:]])(g|V)(?=( |\u00a0)=)|(?<=Hedges' )g(?![[:alnum:]])|",
+                      "(?<=Cram\u00e9r's )V(?![[:alnum:]])|(?<=Welch's )t(?= tests?)|\u03c7(?=\u00b2)")
 stat_pieces <- function(text) {
   m <- gregexpr(stat_symbol, text, perl = TRUE)[[1]]
   if (m[1] == -1) return(list(list(text = text, italic = FALSE)))
@@ -178,24 +186,41 @@ family_labels <- c(Helpfulness = "Perceived helpfulness", Experiences = "Experie
 
 summaries <- desc("Table1_Summaries")
 group_names <- c("Overall", "Non-users", "Users")
-t1_cols <- c("Characteristic", "Overall", "Non_users", "Users")
+t1_cols <- c("Characteristic", "Overall", "Non_users", "Users", "p", "Effect")
+
+# Users vs non-users (07_table1_group_tests.R): Welch t with Hedges' g for
+# continuous rows; chi-square (Monte Carlo exact where an expected count is
+# below 5) with Cramer's V on each categorical heading row.
+t1_continuous_tests <- round_b("Table1_Group_Tests.xlsx", "Continuous")
+t1_categorical_tests <- round_b("Table1_Group_Tests.xlsx", "Categorical_Tests")
+t1_test <- function(variable) {
+  if (variable %in% t1_continuous_tests$variable) {
+    r <- t1_continuous_tests[t1_continuous_tests$variable == variable, ]
+    return(c(fp(r$p_welch), paste0("g = ", f2(r$hedges_g))))
+  }
+  r <- t1_categorical_tests[t1_categorical_tests$variable == variable, ]
+  c(fp(r$p_value), paste0("V = ", f2(r$cramers_v)))
+}
 
 t1_summary <- function(variable, level = NA) {
   s <- summaries[summaries$variable == variable & (if (is.na(level)) is.na(summaries$level) else summaries$level %in% level), ]
   s[match(group_names, s$group), ]
 }
-t1_row <- function(label, cells, type = "regular") {
-  tibble(row_type = type, Characteristic = label, Overall = cells[1], Non_users = cells[2], Users = cells[3])
+t1_row <- function(label, cells, type = "regular", test = c("", "")) {
+  tibble(row_type = type, Characteristic = label, Overall = cells[1], Non_users = cells[2], Users = cells[3],
+         p = test[1], Effect = test[2])
 }
 # Continuous: M (SD); categorical: n (%).
 t1_continuous <- function(variable, label, digits = 2) {
   s <- t1_summary(variable)
   mean <- ifelse(round(s$mean, digits) == 0, 0, s$mean)
-  t1_row(label, paste0(f2(mean, digits), " (", f2(s$sd, digits), ")"))
+  t1_row(label, paste0(f2(mean, digits), " (", f2(s$sd, digits), ")"), test = t1_test(variable))
 }
-t1_categories <- function(heading, variable, levels, labels = levels) {
+t1_categories <- function(heading, variable, levels, labels = levels, test = TRUE) {
+  heading_row <- group_row(heading, t1_cols)
+  if (test) heading_row[c("p", "Effect")] <- as.list(t1_test(variable))
   bind_rows(
-    group_row(heading, t1_cols),
+    heading_row,
     map2_dfr(levels, labels, function(l, label) {
       s <- t1_summary(variable, l)
       t1_row(label, paste0(comma(s$n), " (", f2(s$pct, 1), ")"), "category")
@@ -211,15 +236,14 @@ table1_rows <- bind_rows(
                                             "Bachelor's degree", "Master's degree or higher")),
   t1_categories("Income", "income", c("Much below average", "Below average", "About average",
                                       "Above average", "Much above average")),
-  t1_categories("Religious affiliation", "religion",
-                c("Jewish", "Muslim", "Christian", "Druze", "Atheist / no religion", "Other"),
-                c("Jewish", "Muslim", "Christian", "Druze", "Atheist or no religion", "Other")),
+  t1_categories("Sector", "sector", c("Jewish, other or no religion", "Arab"),
+                c("Jewish, other religion, or no religion", "Arab (Muslim, Christian, or Druze)")),
   section_row("AI use", t1_cols),
   t1_categories("General AI use, past 3 months", "ai_general_frequency",
                 c("Not at all", "A few times", "Several times a month", "Several times a week",
                   "Almost every day / every day"),
                 c("Not at all", "A few times", "Several times a month", "Several times a week",
-                  "Almost every day or every day")),
+                  "Almost every day or every day"), test = FALSE),
   section_row("Psychological and interpersonal", t1_cols),
   t1_continuous("distress_z", "Psychological distress (composite z score)"),
   t1_continuous("loneliness", "Loneliness (UCLA-3, 3–9)"),
@@ -236,13 +260,18 @@ group_n <- setNames(t1_summary("age")$n, group_names)
 loneliness_missing <- group_n - t1_summary("loneliness")$n
 stopifnot(loneliness_missing[["Overall"]] == 2, loneliness_missing[["Users"]] == 0)
 
-table1_ft <- pub_table(table1, c(2.9, 1.2, 1.3, 1.7), c("left", rep("center", 3)), 9, table1_rows$row_type) %>%
+table1_ft <- pub_table(table1, c(2.4, 1.05, 1.1, 1.35, 0.55, 0.65), c("left", rep("center", 5)), 9,
+                       table1_rows$row_type, group_span = 4) %>%
   set_header_labels(
     Characteristic = "Characteristic",
     Overall = paste0("Overall\n(N = ", comma(group_n[["Overall"]]), ")"),
     Non_users = paste0("Non-users\n(n = ", comma(group_n[["Non-users"]]), ")"),
-    Users = paste0("AI emotional-support users\n(n = ", comma(group_n[["Users"]]), ")")
+    Users = paste0("AI emotional-support users\n(n = ", comma(group_n[["Users"]]), ")"),
+    p = "p", Effect = "Effect size"
   )
+gender_test <- t1_categorical_tests[t1_categorical_tests$variable == "gender", ]
+stopifnot(grepl("Monte Carlo", gender_test$test),
+          all(!grepl("Monte Carlo", t1_categorical_tests$test[t1_categorical_tests$variable %in% c("education", "income", "sector")])))
 
 write_table_doc(
   file.path(main_dir, "tables", "Table_1_Participant_Characteristics.docx"), "Table 1",
@@ -253,7 +282,12 @@ write_table_doc(
     "Psychological distress is the standardized mean of the PHQ-9, GAD-7, and PSS-10 z scores. The 533 ",
     "participants who reported no index trauma were not administered the PCL-5 and are scored 0. ",
     "The direct LEC-5 count excludes items 14–15, which were classified as indirect exposure. Loneliness was ",
-    "missing for ", loneliness_missing[["Overall"]], " participants (both non-users); all other characteristics were complete."
+    "missing for ", loneliness_missing[["Overall"]], " participants (both non-users); all other characteristics were complete. ",
+    "Sector was classified from reported religion: Muslim, Christian, or Druze (Arab) versus Jewish, other religion, ",
+    "or no religion. Users and non-users were compared with Welch's t tests (effect size Hedges' g, users minus ",
+    "non-users) and Pearson's \u03c7\u00b2 tests (Cram\u00e9r's V); for gender, which had expected counts below 5, ",
+    "the p value is from a Monte Carlo exact test (100,000 replicates). These are unadjusted comparisons; adjusted ",
+    "estimates are in Table 2. No test is reported for general AI use, which is structurally related to the outcome."
   )
 )
 
@@ -477,6 +511,76 @@ figure2 <- wrap_plots(
   theme(legend.position = "bottom", legend.justification = "left", legend.margin = margin(0, 0, 0, 0),
         legend.text = ggtext::element_markdown(size = 7.5, colour = ink))
 save_figure(figure2, "Figure_2_Intensive_Emotional_Support_Users", 7.2, 4.6)
+
+
+# Figure 3 (post hoc, exploratory): childhood adversity and AI
+# emotional-support use across age groups (09_ace_by_age.R). Panel A is
+# descriptive; panel B shows age- and gender-adjusted ORs within age groups.
+ace_cells <- round_b("ACE_by_Age.xlsx", "Cells")
+ace_or <- round_b("ACE_by_Age.xlsx", "ACE_OR_by_Age")
+ace_tests <- round_b("ACE_by_Age.xlsx", "Interaction_Tests")
+stopifnot(all(ace_cells$n >= 30))
+dash <- function(x) gsub("-", "\u2013", x)
+age_levels3 <- dash(unique(ace_or$age_group[ace_or$age_group != "All ages"]))
+ace_levels3 <- c("0", "1\u20133", "4 or more")
+ace_palette <- setNames(c("#9DB9D6", blue, "#173A5E"), ace_levels3)
+
+figure3_a_data <- ace_cells %>%
+  mutate(age_group = factor(dash(age_group), age_levels3), ace_group = factor(dash(ace_group), ace_levels3))
+pd3 <- position_dodge(width = 0.38)
+figure3_a <- ggplot(figure3_a_data, aes(age_group, pct, colour = ace_group, group = ace_group)) +
+  geom_line(position = pd3, linewidth = 0.6) +
+  geom_errorbar(aes(ymin = CI_lower, ymax = CI_upper), position = pd3, width = 0, linewidth = 0.5, alpha = 0.8) +
+  geom_point(aes(shape = ace_group), position = pd3, size = 2.1, fill = "white", stroke = 0.8) +
+  scale_colour_manual(values = ace_palette, name = "ACE-10 score") +
+  scale_shape_manual(values = c(21, 22, 24), name = "ACE-10 score") +
+  scale_y_continuous(limits = c(0, 82), breaks = seq(0, 80, 20), labels = function(x) paste0(x, "%"),
+                     expand = expansion(mult = c(0, 0))) +
+  labs(x = "Age group (years)", y = NULL, title = "A. AI emotional-support use (%), 95% CI") +
+  figure_theme +
+  theme(panel.grid.major.x = element_blank(), panel.grid.major.y = element_line(colour = "#E6EBEF", linewidth = 0.35),
+        axis.ticks.x = element_blank(), legend.position = c(0.99, 0.99), legend.justification = c(1, 1),
+        legend.title = element_text(size = 7.5, colour = ink), legend.text = element_text(size = 7.5, colour = ink),
+        legend.key.height = unit(9, "pt"), legend.background = element_blank())
+
+figure3_b_data <- ace_or %>%
+  mutate(age_group = factor(dash(age_group), rev(c(age_levels3, "All ages"))),
+         overall = age_group == "All ages",
+         label = paste0(f2(OR), " [", f2(CI_lower), ", ", f2(CI_upper), "]"))
+x_lab3 <- 3.3
+figure3_b <- ggplot(figure3_b_data, aes(y = age_group)) +
+  geom_vline(xintercept = 1, colour = muted, linewidth = 0.4, linetype = "dashed") +
+  geom_segment(aes(x = CI_lower, xend = CI_upper, yend = age_group), colour = blue, linewidth = 0.55, alpha = 0.7) +
+  geom_point(aes(x = OR, shape = overall), colour = blue, fill = blue, size = 2.3) +
+  geom_text(aes(x = x_lab3, label = label), hjust = 1, size = 2.5, colour = ink) +
+  scale_shape_manual(values = c(`FALSE` = 16, `TRUE` = 18), guide = "none") +
+  scale_x_continuous(trans = "log", limits = c(0.9, x_lab3), breaks = c(1, 1.25, 1.5, 2),
+                     labels = c("1", "1.25", "1.5", "2"), expand = expansion(mult = c(0.01, 0))) +
+  labs(x = "Adjusted OR per SD of ACE-10 score (log scale)", y = NULL,
+       title = "B. Adjusted OR [95% CI] within age group") +
+  figure_theme + theme(axis.text.y = element_text(colour = ink, size = 7.5))
+
+continuous_test <- ace_tests[ace_tests$term == "ace_z:age_decades", ]
+group_test <- ace_tests[!is.na(ace_tests$F), ]
+figure3 <- (figure3_a | figure3_b) + plot_layout(widths = c(1.15, 1)) +
+  plot_annotation(
+    caption = paste0(
+      "Post hoc exploratory analysis (*N* = ", comma(sum(ace_cells$n)), "). A: descriptive percentages with logit-based ",
+      "95% CIs (cell *n* = ", min(ace_cells$n), "\u2013", max(ace_cells$n), "; ages 65 and older pooled).<br>",
+      "B: ORs from logistic regressions within each age group, adjusted for age (years) and female gender; fully adjusted ",
+      "estimates are in Table 2.<br>ACE \u00d7 age interaction: continuous age, *p* = ", fp(continuous_test$p_value),
+      "; age groups, *F*(", group_test$df_num, ", ", comma(group_test$df_den), ") = ", f2(group_test$F), ", *p* = ",
+      fp(group_test$p_value), "."
+    ),
+    theme = caption_theme
+  )
+save_figure(figure3, "Figure_3_ACE_Across_Age_Groups", 7.2, 3.5)
+figure3_data <- bind_rows(
+  transmute(figure3_a_data, panel = "A", age_group = as.character(age_group), ace_group = as.character(ace_group),
+            n, users, estimate = pct, CI_lower, CI_upper),
+  transmute(figure3_b_data, panel = "B", age_group = as.character(age_group), ace_group = "per SD",
+            n, users, estimate = OR, CI_lower, CI_upper)
+)
 
 
 # ---- Table S1: AI experiences among emotional-support users ------
@@ -724,11 +828,45 @@ write_table_doc(
 )
 
 
+# ---- Table S5: war-related exposure and topics (post hoc) ---------
+
+topic_models <- round_b("Topics_by_War_Exposure.xlsx", "Topic_Models")
+topic_primary <- filter(topic_models, grepl("^Primary", specification))
+topic_unadjusted <- filter(topic_models, grepl("^Secondary", specification))
+stopifnot(nrow(topic_primary) == 12, identical(topic_primary$variable, q05_items))
+tableS5 <- tibble(Topic = topic_primary$topic,
+                  Users = paste0(comma(topic_primary$n_topic), " (", f2(topic_primary$pct_topic, 1), ")"),
+                  OR = f_or(topic_primary$OR_per_SD, topic_primary$CI_lower, topic_primary$CI_upper),
+                  p = fp(topic_primary$p_value), Holm_p = fp(topic_primary$p_holm))
+holm_significant <- topic_primary$topic[topic_primary$p_holm < .05]
+unadjusted_significant <- topic_unadjusted$topic[topic_unadjusted$p_holm < .05]
+
+write_table_doc(
+  file.path(supplement_dir, "tables", "Table_S5_War_Exposure_and_Topics.docx"), "Table S5",
+  "October 7 and War-Related Exposure and Topics Discussed With AI Among Emotional-Support Users (Exploratory)",
+  list(pub_table(tableS5, c(3.0, 1.15, 1.55, 0.7, 0.7), c("left", rep("center", 4)), 9) %>%
+         set_header_labels(values = c(Topic = "Topic", Users = "Users discussing\nthe topic, n (%)",
+                                      OR = "OR [95% CI]\nper SD", p = "p", Holm_p = "Holm p")) %>%
+         bold_p(5, topic_primary$p_holm)),
+  paste0(
+    "n = ", comma(unique(topic_primary$n)), " AI emotional-support users. Post hoc exploratory analysis. Each row is a ",
+    "separate logistic regression of the topic on the October 7 and war-related exposure index (per SD of the ",
+    "retained sample), adjusted for age (years) and female gender; psychological distress and PTSD symptoms were not ",
+    "adjusted for. Holm adjustment is across the 12 topics. Without covariates, the same ",
+    if (identical(unadjusted_significant, holm_significant)) "single topic" else "topics",
+    " remained significant after Holm correction (", paste(tolower(unadjusted_significant), collapse = ", "),
+    ": Holm p = ", fp(topic_unadjusted$p_holm[topic_unadjusted$p_holm < .05]), "). Bold: Holm p<0.05."
+  )
+)
+
+
 # ---- Source data --------------------------------------------------
 
-write_xlsx(list(Table_1 = table1, Table_2 = table2, Figure_1_Data = figure1_data, Figure_2_Data = figure2_data),
+write_xlsx(list(Table_1 = table1, Table_2 = table2, Figure_1_Data = figure1_data, Figure_2_Data = figure2_data,
+                Figure_3_Data = figure3_data),
            file.path(main_dir, "source_data", "MAIN_Results_Tables.xlsx"))
 write_xlsx(list(Table_S1 = tableS1, Table_S2_A = select(s2a, -p_value),
                 Table_S2_B = select(s2b, -ends_with("p_value")), Table_S2_C = select(s2c, -p_value),
-                Table_S3 = tableS3, Table_S3_All_Terms = tableS3_all, Table_S4_A = select(s4a, -p_value), Table_S4_B = s4b),
+                Table_S3 = tableS3, Table_S3_All_Terms = tableS3_all, Table_S4_A = select(s4a, -p_value), Table_S4_B = s4b,
+                Table_S5 = tableS5),
            file.path(supplement_dir, "source_data", "SUPPLEMENT_Results_Tables.xlsx"))

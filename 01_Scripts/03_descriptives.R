@@ -49,7 +49,7 @@ frequency <- map_dfr(c(general = "ai_general_frequency", emotional_support = "ai
 # ---- Table 1: characteristics by emotional-support use -----------
 
 continuous_vars <- c("age", "distress_z", "loneliness", "social_support", "pcl", "ace", "lec_direct", "oct7_total_14")
-categorical_vars <- c("gender", "education", "income", "religion", "ai_general_frequency")
+categorical_vars <- c("gender", "education", "income", "religion", "sector", "ai_general_frequency")
 
 table1_summaries <- imap_dfr(groups, function(d, group) {
   continuous <- map_dfr(continuous_vars, function(v) {
