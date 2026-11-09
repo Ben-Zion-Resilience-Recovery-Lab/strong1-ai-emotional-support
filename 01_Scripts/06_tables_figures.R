@@ -279,15 +279,13 @@ write_table_doc(
   list(table1_ft),
   paste0(
     "Values are M (SD) or n (%). Non-users reported no AI emotional-support use in the past 3 months. ",
-    "Psychological distress is the standardized mean of the PHQ-9, GAD-7, and PSS-10 z scores. The 533 ",
-    "participants who reported no index trauma were not administered the PCL-5 and are scored 0. ",
-    "The direct LEC-5 count excludes items 14–15, which were classified as indirect exposure. Loneliness was ",
-    "missing for ", loneliness_missing[["Overall"]], " participants (both non-users); all other characteristics were complete. ",
-    "Sector was classified from reported religion: Muslim, Christian, or Druze (Arab) versus Jewish, other religion, ",
-    "or no religion. Users and non-users were compared with Welch's t tests (effect size Hedges' g, users minus ",
-    "non-users) and Pearson's \u03c7\u00b2 tests (Cram\u00e9r's V); for gender, which had expected counts below 5, ",
-    "the p value is from a Monte Carlo exact test (100,000 replicates). These are unadjusted comparisons; adjusted ",
-    "estimates are in Table 2. No test is reported for general AI use, which is structurally related to the outcome."
+    "Psychological distress is the standardized mean of the PHQ-9, GAD-7, and PSS-10 z scores. Participants ",
+    "without an index trauma (n = 533) were not administered the PCL-5 and are scored 0. The direct LEC-5 count ",
+    "excludes items 14–15 (indirect exposure). Loneliness was missing for ", loneliness_missing[["Overall"]],
+    " non-users. Sector: Arab (Muslim, Christian, or Druze) versus Jewish, other religion, or no religion. ",
+    "Unadjusted comparisons used Welch's t tests (Hedges' g, users minus non-users) and \u03c7\u00b2 tests ",
+    "(Cram\u00e9r's V); the gender p value is from a Monte Carlo exact test. General AI use was not tested because ",
+    "it is structurally related to the outcome."
   )
 )
 
@@ -361,11 +359,11 @@ write_table_doc(
         "Interpersonal Factors, PTSD Symptoms, and Trauma Exposure"),
   list(table2_ft),
   paste0(
-    "Adjusted odds ratios (ORs) with 95% CIs from logistic regressions fitted to the same complete-case sample at ",
-    "every step; M2 to M5 add the predictors for H1 to H4, respectively. Age is per year; ",
-    "other continuous predictors are per SD. Block tests are Wald tests of the terms added at each step (M1: all ",
-    "demographic terms). Participants who reported no index trauma (n = 532) were not administered the PCL-5 and ",
-    "are scored 0. The October 7 and war-related exposure index includes relocation during the Iran war. Bold: p<0.05."
+    "Adjusted odds ratios (ORs) with 95% CIs; every step uses the same complete-case sample, and M2 to M5 add the ",
+    "predictors for H1 to H4. Age is per year; other continuous predictors are per SD. Block tests are Wald tests ",
+    "of the terms added at each step (M1: all demographic terms). Participants without an index trauma (n = 532) ",
+    "were not administered the PCL-5 and are scored 0. The October 7 and war-related exposure index includes ",
+    "relocation during the Iran war. Bold: p < 0.05."
   ),
   landscape = TRUE
 )
@@ -513,74 +511,56 @@ figure2 <- wrap_plots(
 save_figure(figure2, "Figure_2_Intensive_Emotional_Support_Users", 7.2, 4.6)
 
 
-# Figure 3 (post hoc, exploratory): childhood adversity and AI
-# emotional-support use across age groups (09_ace_by_age.R). Panel A is
-# descriptive; panel B shows age- and gender-adjusted ORs within age groups.
+# Figure 3 (post hoc, exploratory): AI emotional-support use by childhood
+# adversity (ACE-10 group) within age groups, from 09_ace_by_age.R. The figure
+# is descriptive only; the adjusted within-age ORs and the ACE x age
+# interaction tests are reported in the Results and remain in
+# Round_B/ACE_by_Age.xlsx.
 ace_cells <- round_b("ACE_by_Age.xlsx", "Cells")
-ace_or <- round_b("ACE_by_Age.xlsx", "ACE_OR_by_Age")
-ace_tests <- round_b("ACE_by_Age.xlsx", "Interaction_Tests")
-stopifnot(all(ace_cells$n >= 30))
+stopifnot(nrow(ace_cells) == 18, all(ace_cells$n >= 30))
 dash <- function(x) gsub("-", "\u2013", x)
-age_levels3 <- dash(unique(ace_or$age_group[ace_or$age_group != "All ages"]))
+age_levels3 <- dash(unique(ace_cells$age_group))
 ace_levels3 <- c("0", "1\u20133", "4 or more")
-ace_palette <- setNames(c("#9DB9D6", blue, "#173A5E"), ace_levels3)
+# Grey, blue, navy: ordered by ACE group, each at least 3:1 against white,
+# and the groups also differ in marker shape.
+ace_palette <- setNames(c("#8A949B", blue, "#173A5E"), ace_levels3)
 
-figure3_a_data <- ace_cells %>%
-  mutate(age_group = factor(dash(age_group), age_levels3), ace_group = factor(dash(ace_group), ace_levels3))
-pd3 <- position_dodge(width = 0.38)
-figure3_a <- ggplot(figure3_a_data, aes(age_group, pct, colour = ace_group, group = ace_group)) +
+figure3_data <- ace_cells %>%
+  transmute(age_group = factor(dash(age_group), age_levels3), ace_group = factor(dash(ace_group), ace_levels3),
+            n, users, pct, CI_lower, CI_upper)
+pd3 <- position_dodge(width = 0.45)
+# Space between legend entries: legend.key.spacing.x from ggplot2 3.5,
+# legend.text margins before that.
+key_spacing <- if (packageVersion("ggplot2") >= "3.5.0") theme(legend.key.spacing.x = unit(10, "pt")) else theme()
+figure3 <- ggplot(figure3_data, aes(age_group, pct, colour = ace_group, group = ace_group)) +
   geom_line(position = pd3, linewidth = 0.6) +
-  geom_errorbar(aes(ymin = CI_lower, ymax = CI_upper), position = pd3, width = 0, linewidth = 0.5, alpha = 0.8) +
-  geom_point(aes(shape = ace_group), position = pd3, size = 2.1, fill = "white", stroke = 0.8) +
+  geom_errorbar(aes(ymin = CI_lower, ymax = CI_upper), position = pd3, width = 0.18, linewidth = 0.45,
+                show.legend = FALSE) +
+  geom_point(aes(shape = ace_group, fill = ace_group), position = pd3, size = 2.4, colour = "white", stroke = 0.5) +
   scale_colour_manual(values = ace_palette, name = "ACE-10 score") +
+  scale_fill_manual(values = ace_palette, name = "ACE-10 score") +
   scale_shape_manual(values = c(21, 22, 24), name = "ACE-10 score") +
   scale_y_continuous(limits = c(0, 82), breaks = seq(0, 80, 20), labels = function(x) paste0(x, "%"),
                      expand = expansion(mult = c(0, 0))) +
-  labs(x = "Age group (years)", y = NULL, title = "A. AI emotional-support use (%), 95% CI") +
+  labs(x = "Age group (years)", y = "Used AI for emotional support\n(% within each age-by-ACE group)") +
   figure_theme +
   theme(panel.grid.major.x = element_blank(), panel.grid.major.y = element_line(colour = "#E6EBEF", linewidth = 0.35),
-        axis.ticks.x = element_blank(), legend.position = c(0.99, 0.99), legend.justification = c(1, 1),
-        legend.title = element_text(size = 7.5, colour = ink), legend.text = element_text(size = 7.5, colour = ink),
-        legend.key.height = unit(9, "pt"), legend.background = element_blank())
-
-figure3_b_data <- ace_or %>%
-  mutate(age_group = factor(dash(age_group), rev(c(age_levels3, "All ages"))),
-         overall = age_group == "All ages",
-         label = paste0(f2(OR), " [", f2(CI_lower), ", ", f2(CI_upper), "]"))
-x_lab3 <- 3.3
-figure3_b <- ggplot(figure3_b_data, aes(y = age_group)) +
-  geom_vline(xintercept = 1, colour = muted, linewidth = 0.4, linetype = "dashed") +
-  geom_segment(aes(x = CI_lower, xend = CI_upper, yend = age_group), colour = blue, linewidth = 0.55, alpha = 0.7) +
-  geom_point(aes(x = OR, shape = overall), colour = blue, fill = blue, size = 2.3) +
-  geom_text(aes(x = x_lab3, label = label), hjust = 1, size = 2.5, colour = ink) +
-  scale_shape_manual(values = c(`FALSE` = 16, `TRUE` = 18), guide = "none") +
-  scale_x_continuous(trans = "log", limits = c(0.9, x_lab3), breaks = c(1, 1.25, 1.5, 2),
-                     labels = c("1", "1.25", "1.5", "2"), expand = expansion(mult = c(0.01, 0))) +
-  labs(x = "Adjusted OR per SD of ACE-10 score (log scale)", y = NULL,
-       title = "B. Adjusted OR [95% CI] within age group") +
-  figure_theme + theme(axis.text.y = element_text(colour = ink, size = 7.5))
-
-continuous_test <- ace_tests[ace_tests$term == "ace_z:age_decades", ]
-group_test <- ace_tests[!is.na(ace_tests$F), ]
-figure3 <- (figure3_a | figure3_b) + plot_layout(widths = c(1.15, 1)) +
+        axis.line.x = element_line(colour = muted, linewidth = 0.3), axis.ticks.x = element_blank(),
+        axis.title.y = element_text(colour = muted, size = 7.5, margin = margin(r = 6)),
+        legend.position = "top", legend.justification = "left", legend.margin = margin(0, 0, 0, 0),
+        legend.box.spacing = unit(3, "pt"), legend.title = element_text(size = 7.5, colour = ink),
+        legend.text = element_text(size = 7.5, colour = ink, margin = margin(l = 3, r = 8)),
+        legend.key.width = unit(14, "pt")) +
+  key_spacing +
   plot_annotation(
     caption = paste0(
-      "Post hoc exploratory analysis (*N* = ", comma(sum(ace_cells$n)), "). A: descriptive percentages with logit-based ",
-      "95% CIs (cell *n* = ", min(ace_cells$n), "\u2013", max(ace_cells$n), "; ages 65 and older pooled).<br>",
-      "B: ORs from logistic regressions within each age group, adjusted for age (years) and female gender; fully adjusted ",
-      "estimates are in Table 2.<br>ACE \u00d7 age interaction: continuous age, *p* = ", fp(continuous_test$p_value),
-      "; age groups, *F*(", group_test$df_num, ", ", comma(group_test$df_den), ") = ", f2(group_test$F), ", *p* = ",
-      fp(group_test$p_value), "."
+      "Percentages are calculated within age-by-ACE groups; error bars indicate logit-based 95% CIs (*N* = ",
+      comma(sum(ace_cells$n)), ").<br>Ages 65+ were pooled because of sparse cells."
     ),
     theme = caption_theme
   )
-save_figure(figure3, "Figure_3_ACE_Across_Age_Groups", 7.2, 3.5)
-figure3_data <- bind_rows(
-  transmute(figure3_a_data, panel = "A", age_group = as.character(age_group), ace_group = as.character(ace_group),
-            n, users, estimate = pct, CI_lower, CI_upper),
-  transmute(figure3_b_data, panel = "B", age_group = as.character(age_group), ace_group = "per SD",
-            n, users, estimate = OR, CI_lower, CI_upper)
-)
+save_figure(figure3, "Figure_3_ACE_Across_Age_Groups", 7.2, 4.8)
+figure3_data <- mutate(figure3_data, across(c(age_group, ace_group), as.character))
 
 
 # ---- Table S1: AI experiences among emotional-support users ------
@@ -601,8 +581,8 @@ write_table_doc(
   "Descriptive Characteristics of AI Emotional-Support Use",
   list(pub_table(tableS1, c(4.6, 0.8, 1.7), c("left", "center", "center"), 9, tableS1_rows$row_type) %>%
          set_header_labels(percentage_ci = "% [95% CI]")),
-  paste0("n = ", comma(n_users), " AI emotional-support users. Multiple responses were permitted for experiences ",
-         "and topics. Percentages are shown with logit-based 95% CIs.")
+  paste0("n = ", comma(n_users), " AI emotional-support users; multiple responses were permitted. Percentages ",
+         "with logit-based 95% CIs.")
 )
 
 
@@ -675,10 +655,9 @@ write_table_doc(
   ),
   paste0(
     "Adjusted ORs per SD with 95% CIs; each model includes all covariates of the indicated hierarchical step. ",
-    "Main-analysis estimates are in Table 2. A: PHQ-9, GAD-7, and PSS-10 replace the distress composite. ",
-    "B: respondents reporting AI emotional-support use but no general AI use are excluded. C: participants who ",
-    "reported no index trauma (scored 0 on the PCL-5 in the main analysis) are excluded. Users = AI ",
-    "emotional-support users. Bold: p<0.05."
+    "A: PHQ-9, GAD-7, and PSS-10 replace the distress composite. B: excludes respondents reporting AI ",
+    "emotional-support use but no general AI use. C: excludes participants without an index trauma (scored 0 on ",
+    "the PCL-5 in the main analysis). Users = AI emotional-support users. Bold: p < 0.05."
   )
 )
 
@@ -760,7 +739,7 @@ write_table_doc(
   paste0(
     "n = ", comma(sum(secondary_sample$n)), " participants reporting any general AI use (",
     comma(sum(secondary_sample$users)), " AI emotional-support users). All predictors were entered simultaneously. ",
-    "Bold indicates p < .05."
+    "Bold: p < 0.05."
   )
 )
 
@@ -822,8 +801,8 @@ write_table_doc(
     "age, gender, and all M5 psychological, interpersonal, and trauma predictors; excludes ",
     check_value("Excluded: gender 'Other' (none daily)"), " users reporting another gender (none daily); ",
     "c-statistic = ", f2(check_value("c-statistic")), ". B: differences (daily minus less frequent) in percentage ",
-    "points (pp) with Wald 95% CIs not adjusted for multiplicity; p values from Fisher's exact tests, Holm-adjusted ",
-    "within item family (helpfulness, 2 items; experiences, 7; topics, 12). Bold: p<0.05."
+    "points (pp) with Wald 95% CIs not adjusted for multiplicity; Fisher's exact p values, Holm-adjusted within ",
+    "item family (helpfulness, 2 items; experiences, 7; topics, 12). Bold: p < 0.05."
   )
 )
 
@@ -849,13 +828,12 @@ write_table_doc(
                                       OR = "OR [95% CI]\nper SD", p = "p", Holm_p = "Holm p")) %>%
          bold_p(5, topic_primary$p_holm)),
   paste0(
-    "n = ", comma(unique(topic_primary$n)), " AI emotional-support users. Post hoc exploratory analysis. Each row is a ",
-    "separate logistic regression of the topic on the October 7 and war-related exposure index (per SD of the ",
-    "retained sample), adjusted for age (years) and female gender; psychological distress and PTSD symptoms were not ",
-    "adjusted for. Holm adjustment is across the 12 topics. Without covariates, the same ",
-    if (identical(unadjusted_significant, holm_significant)) "single topic" else "topics",
-    " remained significant after Holm correction (", paste(tolower(unadjusted_significant), collapse = ", "),
-    ": Holm p = ", fp(topic_unadjusted$p_holm[topic_unadjusted$p_holm < .05]), "). Bold: Holm p<0.05."
+    "n = ", comma(unique(topic_primary$n)), " AI emotional-support users. Each row is a separate logistic regression ",
+    "of the topic on the October 7 and war-related exposure index (per SD of the retained sample), adjusted for age ",
+    "and female gender but not for psychological distress or PTSD symptoms. Holm adjustment is across the 12 topics. ",
+    "Without covariates, the same ", if (identical(unadjusted_significant, holm_significant)) "single topic" else "topics",
+    " remained significant (", paste(tolower(unadjusted_significant), collapse = ", "),
+    ": Holm p = ", fp(topic_unadjusted$p_holm[topic_unadjusted$p_holm < .05]), "). Bold: Holm p < 0.05."
   )
 )
 

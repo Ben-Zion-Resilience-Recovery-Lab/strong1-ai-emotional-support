@@ -50,7 +50,7 @@ Each script runs in its own R process, in order, and the pipeline stops at the f
 | `06_tables_figures.R` | Publication tables and figures, built only from the workbooks of 03–05 and 07–09; runs last | Tables, figures, source data |
 | `07_table1_group_tests.R` | Round B: users vs nonusers on every Table 1 characteristic (Welch t, chi-square or Monte Carlo exact) | `Round_B/Table1_Group_Tests.xlsx` |
 | `08_topics_by_war_exposure.R` | Round B, exploratory: October 7 and war-related exposure and the 12 AI topics among users, Holm-corrected | `Round_B/Topics_by_War_Exposure.xlsx` |
-| `09_ace_by_age.R` | Round B, exploratory: AI emotional-support use by ACE group across age groups; ACE x age tests; candidate figure | `Round_B/ACE_by_Age.xlsx`, `Round_B/figures/` |
+| `09_ace_by_age.R` | Round B, exploratory: AI emotional-support use by ACE group across age groups; within-age ACE ORs and ACE x age tests (reported in the Results) | `Round_B/ACE_by_Age.xlsx` |
 
 `02_data_checks.R` stops if the audited QC counts, scale scores, LEC-5 direct-exposure checks, routing or analytic sample sizes are not reproduced.
 
@@ -69,7 +69,7 @@ Each script runs in its own R process, in order, and the pipeline stops at the f
 | --- | --- |
 | `02_Analysis_Outputs/` | Aggregate analysis workbooks, with every reported estimate |
 | `03_Main_Outputs/tables/` | Table 1 (participant characteristics, with user vs non-user tests), Table 2 (hierarchical models) |
-| `03_Main_Outputs/figures/` | Figure 1 (experiences and topics), Figure 2 (daily vs less frequent users), Figure 3 (ACE across age groups; post hoc); PNG previews in `previews/` |
+| `03_Main_Outputs/figures/` | Figure 1 (experiences and topics), Figure 2 (daily vs less frequent users), Figure 3 (AI emotional-support use by ACE group across age groups, descriptive; post hoc); PNG previews in `previews/` |
 | `04_Supplement/tables/` | Tables S1 (AI experiences), S2 (sensitivity), S3 (general AI users), S4 (intensive users), S5 (war-related exposure and topics; post hoc) |
 | `*/source_data/` | Formatted table contents and figure data, including every coefficient of the Table S3 model |
 
