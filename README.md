@@ -48,6 +48,9 @@ Each script runs in its own R process, in order, and the pipeline stops at the f
 | `04_models.R` | Hierarchical models M1–M5, secondary model, sensitivity analyses | `Models.xlsx` |
 | `05_intensive_users.R` | Daily vs less frequent users: adjusted model and 21 Holm-corrected comparisons | `Intensive_Users.xlsx` |
 | `06_tables_figures.R` | Publication tables and figures, built only from the workbooks of 03–05 | Tables, figures, source data |
+| `07_table1_group_tests.R` | Round B: users vs nonusers on every Table 1 characteristic (Welch t, chi-square or Monte Carlo exact) | `Round_B/Table1_Group_Tests.xlsx` |
+| `08_topics_by_war_exposure.R` | Round B, exploratory: October 7 and war-related exposure and the 12 AI topics among users, Holm-corrected | `Round_B/Topics_by_War_Exposure.xlsx` |
+| `09_ace_by_age.R` | Round B, exploratory: AI emotional-support use by ACE group across age groups; ACE x age tests; candidate figure | `Round_B/ACE_by_Age.xlsx`, `Round_B/figures/` |
 
 `02_data_checks.R` stops if the audited QC counts, scale scores, LEC-5 direct-exposure checks, routing or analytic sample sizes are not reproduced.
 
