@@ -14,11 +14,10 @@
 #               (b) ACE (per SD) x age-group interaction, joint Wald test;
 #               (c) ACE OR per SD within each age group, adjusted for age
 #               (years) and female gender.
-# Output: Round_B/ACE_by_Age.xlsx and the candidate figure in
-# Round_B/figures/.
+# Output: Round_B/ACE_by_Age.xlsx. The publication figure (Figure 3, the
+# descriptive cells only) is drawn by 06_tables_figures.R.
 
 source("01_Scripts/00_setup.R")
-suppressPackageStartupMessages(library(ggplot2))
 
 age_levels <- c("18-24", "25-34", "35-44", "45-54", "55-64", "65+")
 ace_levels <- c("0", "1-3", "4 or more")
@@ -28,7 +27,7 @@ d <- readRDS(analysis_file)$participants %>%
          age_group = cut(age, c(17, 24, 34, 44, 54, 64, Inf), age_levels),
          ace_group = cut(ace, c(-Inf, 0, 3, Inf), ace_levels))
 out_dir <- file.path(analysis_dir, "Round_B")
-dir.create(file.path(out_dir, "figures"), recursive = TRUE, showWarnings = FALSE)
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 prop_ci <- function(x) {
   ci <- confint(svyciprop(~x, svydesign(ids = ~1, probs = ~1, data = data.frame(x)), method = "logit"))
@@ -77,27 +76,3 @@ write_analysis(
        ACE_OR_by_Age = bind_rows(by_age, overall), Monotonicity = monotone),
   file.path("Round_B", "ACE_by_Age.xlsx")
 )
-
-
-# ---- Candidate figure -------------------------------------------
-
-palette <- setNames(c("#9DB4CF", "#3F72AF", "#112D4E"), gsub("-", "\u2013", ace_levels))
-pd <- position_dodge(width = 0.35)
-plot_cells <- mutate(cells, age_group = factor(gsub("-", "\u2013", age_group), gsub("-", "\u2013", age_levels)),
-                     ace_group = factor(gsub("-", "\u2013", ace_group), gsub("-", "\u2013", ace_levels)))
-p <- ggplot(plot_cells, aes(age_group, pct, colour = ace_group, group = ace_group)) +
-  geom_line(position = pd, linewidth = 0.7) +
-  geom_errorbar(aes(ymin = CI_lower, ymax = CI_upper), position = pd, width = 0.18, linewidth = 0.45) +
-  geom_point(aes(shape = ace_group), position = pd, size = 2.3, fill = "white", stroke = 0.9) +
-  scale_colour_manual(values = palette, name = "Adverse childhood experiences (ACE-10)") +
-  scale_shape_manual(values = c(21, 22, 24), name = "Adverse childhood experiences (ACE-10)") +
-  scale_y_continuous(limits = c(0, 85), breaks = seq(0, 80, 20), labels = function(x) paste0(x, "%"),
-                     expand = expansion(mult = c(0, 0.02))) +
-  labs(x = "Age group (years)", y = "Used AI for emotional support\n(past 3 months)") +
-  theme_classic(base_size = 10, base_family = "Helvetica") +
-  theme(legend.position = "top", legend.justification = "left", legend.title = element_text(size = 9),
-        axis.text = element_text(colour = "black"), panel.grid.major.y = element_line(colour = "grey90", linewidth = 0.3))
-for (ext in c("pdf", "png")) {
-  ggsave(file.path(out_dir, "figures", paste0("Candidate_Figure_ACE_by_Age.", ext)), p,
-         width = 6.3, height = 3.8, dpi = 300, device = if (ext == "pdf") cairo_pdf else "png")
-}
