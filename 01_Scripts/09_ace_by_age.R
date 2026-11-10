@@ -9,11 +9,8 @@
 #               pooled because 75+ with ACE 4+ has n = 4; every plotted
 #               cell then has n >= 34 (rule: plot only cells with n >= 30).
 #   Uncertainty Proportions with logit 95% CIs (as in 03_descriptives.R).
-#   Consistency (a) ACE (per SD) x age (per 10 years) interaction, 1 df,
-#               adjusted for female gender: the primary test;
-#               (b) ACE (per SD) x age-group interaction, joint Wald test;
-#               (c) ACE OR per SD within each age group, adjusted for age
-#               (years) and female gender.
+#   Consistency ACE (per SD) x age (per 10 years) interaction, 1 df,
+#               adjusted for age and female gender.
 # Output: Round_B/ACE_by_Age.xlsx. The publication figure (Figure 3, the
 # descriptive cells only) is drawn by 06_tables_figures.R.
 
@@ -46,25 +43,10 @@ margins <- bind_rows(
     mutate(margin = "Age group", group = as.character(group), .before = 1)
 )
 
-# (a) continuous interaction; (b) age-group interaction
+# ACE x age (continuous) interaction
 m_cont <- fit_logit(d, c("ace_z", "age_decades", "female", "ace_z:age_decades"))
-m_group <- fit_logit(d, c("ace_z", "age_group", "female", "ace_z:age_group"))
-interaction_terms <- grep("^ace_z:age_group", names(coef(m_group)), value = TRUE)
-interaction_tests <- bind_rows(
-  odds_ratios(m_cont, c("ace_z", "ace_z:age_decades")) %>%
-    mutate(model = "ACE x age (per 10 years), adjusted for female gender", .before = 1),
-  wald_test(m_group, "ace_z:age_group", "ACE x age group, joint Wald test (5 df)") %>%
-    rename(term = test) %>% mutate(model = "ACE x age group", .before = 1)
-)
-
-# (c) ACE OR per SD within each age group
-by_age <- map_dfr(age_levels, function(g) {
-  s <- filter(d, age_group == g)
-  odds_ratios(fit_logit(s, c("ace_z", "age", "female")), "ace_z") %>%
-    mutate(age_group = g, n = nrow(s), users = sum(s$ai_support_binary), .before = 1)
-})
-overall <- odds_ratios(fit_logit(d, c("ace_z", "age", "female")), "ace_z") %>%
-  mutate(age_group = "All ages", n = nrow(d), users = sum(d$ai_support_binary), .before = 1)
+interaction_tests <- odds_ratios(m_cont, c("ace_z", "ace_z:age_decades")) %>%
+  mutate(model = "ACE x age (per 10 years), adjusted for age and female gender", .before = 1)
 
 # Monotone gradient within each age group (descriptive check)
 monotone <- cells %>% group_by(age_group) %>% arrange(ace_group, .by_group = TRUE) %>%
@@ -73,6 +55,6 @@ monotone <- cells %>% group_by(age_group) %>% arrange(ace_group, .by_group = TRU
 
 write_analysis(
   list(Cells = cells, Margins = margins, Interaction_Tests = interaction_tests,
-       ACE_OR_by_Age = bind_rows(by_age, overall), Monotonicity = monotone),
+       Monotonicity = monotone),
   file.path("Round_B", "ACE_by_Age.xlsx")
 )

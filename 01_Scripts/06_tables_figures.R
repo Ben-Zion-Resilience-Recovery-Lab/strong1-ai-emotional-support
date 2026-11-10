@@ -513,9 +513,8 @@ save_figure(figure2, "Figure_2_Intensive_Emotional_Support_Users", 7.2, 4.6)
 
 # Figure 3 (post hoc, exploratory): AI emotional-support use by childhood
 # adversity (ACE-10 group) within age groups, from 09_ace_by_age.R. The figure
-# is descriptive only; the adjusted within-age ORs and the ACE x age
-# interaction tests are reported in the Results and remain in
-# Round_B/ACE_by_Age.xlsx.
+# is descriptive only; the ACE x age (continuous) interaction test is
+# reported in the Results and remains in Round_B/ACE_by_Age.xlsx.
 ace_cells <- round_b("ACE_by_Age.xlsx", "Cells")
 stopifnot(nrow(ace_cells) == 18, all(ace_cells$n >= 30))
 dash <- function(x) gsub("-", "\u2013", x)
