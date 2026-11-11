@@ -177,7 +177,7 @@ section_row <- function(label, columns, type = "section") {
 }
 group_row <- function(label, columns) section_row(label, columns, "group")
 
-oct7_label <- "October 7 and war-related exposure (14-item index)"
+oct7_label <- "War-related exposure (14-item index)"
 family_labels <- c(Helpfulness = "Perceived helpfulness", Experiences = "Experiences of AI emotional support",
                    Topics = "Topics discussed with AI")
 
@@ -362,8 +362,8 @@ write_table_doc(
     "Adjusted odds ratios (ORs) with 95% CIs; every step uses the same complete-case sample, and M2 to M5 add the ",
     "predictors for H1 to H4. Age is per year; other continuous predictors are per SD. Block tests are Wald tests ",
     "of the terms added at each step (M1: all demographic terms). Participants without an index trauma (n = 532) ",
-    "were not administered the PCL-5 and are scored 0. The October 7 and war-related exposure index includes ",
-    "relocation during the Iran war. Bold: p < 0.05."
+    "were not administered the PCL-5 and are scored 0. The war-related exposure index includes ",
+    "relocation during the subsequent war with Iran. Bold: p < 0.05."
   ),
   landscape = TRUE
 )
@@ -756,7 +756,7 @@ s4a <- bind_rows(
     Predictor = c(age = "Age (years)", female = "Female (vs. male)", distress_z = "Psychological distress (per SD)",
                   pcl_z = "PTSD symptoms (PCL-5; per SD)", ace_z = "Childhood adversity (ACE-10; per SD)",
                   lec_direct_z = "Direct trauma exposure (LEC-5; per SD)",
-                  oct7_z = "October 7 and war-related exposure (14-item index; per SD)",
+                  oct7_z = "War-related exposure (14-item index; per SD)",
                   loneliness_z = "Loneliness (per SD)", social_support_z = "Perceived social support (per SD)")[intensive_model$term],
     `Adjusted OR [95% CI]` = f_or(intensive_model$OR, intensive_model$CI_lower, intensive_model$CI_upper),
     p = fp(intensive_model$p_value), p_value = intensive_model$p_value
@@ -821,14 +821,14 @@ unadjusted_significant <- topic_unadjusted$topic[topic_unadjusted$p_holm < .05]
 
 write_table_doc(
   file.path(supplement_dir, "tables", "Table_S5_War_Exposure_and_Topics.docx"), "Table S5",
-  "October 7 and War-Related Exposure and Topics Discussed With AI Among Emotional-Support Users (Exploratory)",
+  "War-related exposure and Topics Discussed With AI Among Emotional-Support Users (Exploratory)",
   list(pub_table(tableS5, c(3.0, 1.15, 1.55, 0.7, 0.7), c("left", rep("center", 4)), 9) %>%
          set_header_labels(values = c(Topic = "Topic", Users = "Users discussing\nthe topic, n (%)",
                                       OR = "OR [95% CI]\nper SD", p = "p", Holm_p = "Holm p")) %>%
          bold_p(5, topic_primary$p_holm)),
   paste0(
     "n = ", comma(unique(topic_primary$n)), " AI emotional-support users. Each row is a separate logistic regression ",
-    "of the topic on the October 7 and war-related exposure index (per SD of the retained sample), adjusted for age ",
+    "of the topic on the war-related exposure index (per SD of the retained sample), adjusted for age ",
     "and female gender but not for psychological distress or PTSD symptoms. Holm adjustment is across the 12 topics. ",
     "Without covariates, the same ", if (identical(unadjusted_significant, holm_significant)) "single topic" else "topics",
     " remained significant (", paste(tolower(unadjusted_significant), collapse = ", "),
