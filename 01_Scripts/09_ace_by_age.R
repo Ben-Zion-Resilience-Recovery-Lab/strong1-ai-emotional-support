@@ -11,7 +11,7 @@
 #   Uncertainty Proportions with logit 95% CIs (as in 03_descriptives.R).
 #   Consistency ACE (per SD) x age (per 10 years) interaction, 1 df,
 #               adjusted for age and female gender.
-# Output: Round_B/ACE_by_Age.xlsx. The publication figure (Figure 3, the
+# Output: Round_B/ACE_by_Age.xlsx. The publication figure (Figure 2, the
 # descriptive cells only) is drawn by 06_tables_figures.R.
 
 source("01_Scripts/00_setup.R")

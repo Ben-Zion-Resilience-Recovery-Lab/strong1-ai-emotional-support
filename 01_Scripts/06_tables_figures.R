@@ -32,14 +32,21 @@ f2 <- function(x, digits = 2) {
 }
 comma <- function(n) formatC(n, format = "d", big.mark = ",")
 
-# p with a leading zero, as in the manuscript (blank when missing). A p value just below 0.05
-# that would round to 0.050 is shown to four decimals so it cannot be misread as non-significant.
+# p in APA 7 style: no leading zero, "< .001" (blank when missing). A p value just below .05
+# that would round to .050 is shown to four decimals so it cannot be misread as non-significant.
 fp <- function(p) {
   vapply(p, function(x) {
     if (is.na(x)) return("")
-    if (x < .001) return("<0.001")
-    formatC(x, digits = if (x >= .0495 && x < .05) 4 else 3, format = "f")
+    if (x < .001) return("< .001")
+    sub("^0\\.", ".", formatC(x, digits = if (x >= .0495 && x < .05) 4 else 3, format = "f"))
   }, character(1))
+}
+# Statistics that cannot exceed 1 (Cramer's V, c-statistic) take no leading zero (APA 7).
+f2_nz <- function(x, digits = 2) sub("^(\u2212?)0\\.", "\\1.", f2(x, digits))
+# Counts below 10 in running text are written as words (APA 7).
+number_word <- function(n) {
+  words <- c("zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine")
+  ifelse(n >= 0 & n <= 9, words[n + 1], comma(n))
 }
 
 # OR [95% CI]; three decimals when a bound rounds to 1.00 at two.
@@ -59,7 +66,8 @@ f_ci1 <- function(est, lo, hi) {
 # categorical variable's heading, with its reference category),
 # "category" (indented under its group) and "regular".
 
-pub_table <- function(data, widths, align, size, row_type = NULL, group_span = length(widths)) {
+# pad_v: cell padding above and below the text, in points.
+pub_table <- function(data, widths, align, size, row_type = NULL, group_span = length(widths), pad_v = 2) {
   row_type <- row_type %||% rep("regular", nrow(data))
   ft <- flextable(data) %>%
     theme_booktabs() %>%
@@ -68,12 +76,16 @@ pub_table <- function(data, widths, align, size, row_type = NULL, group_span = l
     bold(part = "header") %>%
     align(align = "center", part = "header") %>%
     valign(valign = "center", part = "all") %>%
-    padding(padding.top = 2, padding.bottom = 2, padding.left = 4, padding.right = 4, part = "all") %>%
+    padding(padding.top = pad_v, padding.bottom = pad_v, padding.left = 4, padding.right = 4, part = "all") %>%
     # Rows never split across pages; each table is kept with the
     # paragraph that follows it (the next panel or the note).
     set_table_properties(layout = "fixed", width = 1, align = "center",
                          opts_word = list(split = FALSE, keep_with_next = TRUE)) %>%
-    width(j = seq_along(widths), width = widths)
+    width(j = seq_along(widths), width = widths) %>%
+    # Row height follows the text. flextable's default 0.25 in row height is written as
+    # w:trHeight, which some renderers (e.g., LibreOffice) treat as a minimum.
+    height_all(height = 0.01, part = "all") %>%
+    hrule(rule = "auto", part = "all")
   for (j in seq_along(align)) ft <- align(ft, j = j, align = align[j], part = "body")
   ft <- align(ft, j = 1, align = "left", part = "header")
   sections <- which(row_type == "section")
@@ -102,11 +114,12 @@ bold_p <- function(ft, j, p) {
 }
 
 # APA 7 italics for statistical symbols in table cells, panel titles
-# and notes: N, n, M, SD, OR, F, p, c (c-statistic), z (z score), t and
-# chi-square, and Hedges' g and Cramer's V; a plural "s" stays upright.
+# and notes: N, n, M, SD, OR, F, p, c (c-statistic), z (z score), t, and
+# Hedges' g and Cramer's V; a plural "s" stays upright. Greek letters
+# (chi-square) stay upright (APA 7 6.44).
 stat_symbol <- paste0("(?<![[:alnum:]])(N|n|M|SD|OR|F|p)(?=s?(?![[:alnum:]]))|(?<![[:alnum:]])c(?=[-\u2011]statistic)|",
                       "(?<![[:alnum:]])z(?= scores?)|(?<![[:alnum:]])(g|V)(?=( |\u00a0)=)|(?<=Hedges' )g(?![[:alnum:]])|",
-                      "(?<=Cram\u00e9r's )V(?![[:alnum:]])|(?<=Welch's )t(?= tests?)|\u03c7(?=\u00b2)")
+                      "(?<=Cram\u00e9r's )V(?![[:alnum:]])|(?<=Welch's )t(?= tests?)")
 stat_pieces <- function(text) {
   m <- gregexpr(stat_symbol, text, perl = TRUE)[[1]]
   if (m[1] == -1) return(list(list(text = text, italic = FALSE)))
@@ -144,11 +157,12 @@ text_par <- function(text, size, bold = FALSE, italic = FALSE, top = 0, bottom =
 
 # One Word document: heading, one or more (optionally titled) tables, note.
 write_table_doc <- function(path, number, title, tables, note, landscape = FALSE) {
-  # Side margins leave a text area as wide as the table (7.1 in; 9.9 in landscape).
-  margin <- if (landscape) c(0.6, 0.895) else c(0.75, 0.585)
+  # US Letter, as in the manuscript. Side margins leave a text area as wide as the
+  # widest table (7.1 in portrait; 9.9 in landscape).
+  margin <- if (landscape) c(0.5, 0.55) else c(0.6, 0.7)
   doc <- read_docx() %>%
     body_set_default_section(prop_section(
-      page_size = page_size(orient = if (landscape) "landscape" else "portrait"),
+      page_size = page_size(width = 8.5, height = 11, orient = if (landscape) "landscape" else "portrait"),
       # Header, footer and gutter are set so the layout does not depend on officer defaults.
       page_margins = page_mar(top = margin[1], bottom = margin[1], left = margin[2], right = margin[2],
                               header = 0.5, footer = 0.5, gutter = 0),
@@ -199,7 +213,7 @@ t1_test <- function(variable) {
     return(c(fp(r$p_welch), paste0("g = ", f2(r$hedges_g))))
   }
   r <- t1_categorical_tests[t1_categorical_tests$variable == variable, ]
-  c(fp(r$p_value), paste0("V = ", f2(r$cramers_v)))
+  c(fp(r$p_value), paste0("V = ", f2_nz(r$cramers_v)))
 }
 
 t1_summary <- function(variable, level = NA) {
@@ -260,12 +274,14 @@ group_n <- setNames(t1_summary("age")$n, group_names)
 loneliness_missing <- group_n - t1_summary("loneliness")$n
 stopifnot(loneliness_missing[["Overall"]] == 2, loneliness_missing[["Users"]] == 0)
 
-table1_ft <- pub_table(table1, c(2.4, 1.05, 1.1, 1.35, 0.55, 0.65), c("left", rep("center", 5)), 9,
-                       table1_rows$row_type, group_span = 4) %>%
+# Landscape, single-spaced rows (no extra vertical padding) so the title, all 38 rows and the
+# note fit on one page, as in the manuscript.
+table1_ft <- pub_table(table1, c(3.1, 1.35, 1.42, 1.74, 0.71, 0.84), c("left", rep("center", 5)), 9,
+                       table1_rows$row_type, group_span = 4, pad_v = 0) %>%
   set_header_labels(
     Characteristic = "Characteristic",
     Overall = paste0("Overall\n(N = ", comma(group_n[["Overall"]]), ")"),
-    Non_users = paste0("Non-users\n(n = ", comma(group_n[["Non-users"]]), ")"),
+    Non_users = paste0("Nonusers\n(n = ", comma(group_n[["Non-users"]]), ")"),
     Users = paste0("AI emotional-support users\n(n = ", comma(group_n[["Users"]]), ")"),
     p = "p", Effect = "Effect size"
   )
@@ -278,15 +294,16 @@ write_table_doc(
   "Participant Characteristics by AI Emotional-Support Use",
   list(table1_ft),
   paste0(
-    "Values are M (SD) or n (%). Non-users reported no AI emotional-support use in the past 3 months. ",
+    "Values are M (SD) or n (%). Nonusers reported no AI emotional-support use in the past 3 months. ",
     "Psychological distress is the standardized mean of the PHQ-9, GAD-7, and PSS-10 z scores. Participants ",
     "without an index trauma (n = 533) were not administered the PCL-5 and are scored 0. The direct LEC-5 count ",
-    "excludes items 14–15 (indirect exposure). Loneliness was missing for ", loneliness_missing[["Overall"]],
-    " non-users. Sector: Arab (Muslim, Christian, or Druze) versus Jewish, other religion, or no religion. ",
-    "Unadjusted comparisons used Welch's t tests (Hedges' g, users minus non-users) and \u03c7\u00b2 tests ",
+    "excludes items 14–15 (indirect exposure). Loneliness was missing for ", number_word(loneliness_missing[["Overall"]]),
+    " nonusers. Sector: Arab (Muslim, Christian, or Druze) versus Jewish, other religion, or no religion. ",
+    "Unadjusted comparisons used Welch's t tests (Hedges' g, users minus nonusers) and \u03c7\u00b2 tests ",
     "(Cram\u00e9r's V); the gender p value is from a Monte Carlo exact test. General AI use was not tested because ",
     "it is structurally related to the outcome."
-  )
+  ),
+  landscape = TRUE
 )
 
 
@@ -319,7 +336,7 @@ table2_rows <- bind_rows(
                 c("Primary", "Post-secondary non-academic", "Bachelor's degree", "Master's degree or higher")),
   t2_categories("Income (reference: about average)", "income",
                 c("Much below average", "Below average", "Above average", "Much above average")),
-  t2_categories("Sector (reference: Jewish, other or no religion)", "sector", "Arab"),
+  t2_categories("Sector (reference: Jewish, other religion, or no religion)", "sector", "Arab"),
   section_row("Psychological and interpersonal (per SD)", t2_cols),
   t2_row("distress_z", "Psychological distress"),
   t2_row("loneliness_z", "Loneliness"),
@@ -363,7 +380,7 @@ write_table_doc(
     "predictors for H1 to H4. Age is per year; other continuous predictors are per SD. Block tests are Wald tests ",
     "of the terms added at each step (M1: all demographic terms). Participants without an index trauma (n = 532) ",
     "were not administered the PCL-5 and are scored 0. The war-related exposure index includes ",
-    "relocation during the subsequent war with Iran. Bold: p < 0.05."
+    "relocation during the subsequent war with Iran. Bold: p < .05."
   ),
   landscape = TRUE
 )
@@ -405,11 +422,27 @@ figure_theme <- theme_classic(base_size = 8.5) +
 caption_theme <- theme(plot.caption = ggtext::element_markdown(size = 7, colour = muted, hjust = 0, lineheight = 1.15))
 hide_x <- theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
 
+# Each figure is written at its publication size (width and height in inches):
+#   <name>.pdf  vector, fonts embedded: the file for the journal;
+#   <name>.svg  vector, text converted to outlines so it cannot be re-fonted:
+#               the file for Word (Insert > Pictures), which renders it sharp on
+#               screen, in PDF export and in print;
+#   <name>.png  600 dpi raster at the same size: Word's fallback for the SVG and
+#               for programs that cannot read SVG;
+#   previews/<name>.png  unchanged 600 dpi preview.
 save_figure <- function(plot, name, width, height) {
   ggsave(file.path(main_dir, "figures", "previews", paste0(name, ".png")), plot, width = width, height = height, dpi = 600)
   # Quartz (macOS) and Cairo both embed fonts in the PDF.
   device <- if (capabilities("aqua")) function(filename, ...) grDevices::quartz(file = filename, type = "pdf", ...) else grDevices::cairo_pdf
   ggsave(file.path(main_dir, "figures", paste0(name, ".pdf")), plot, width = width, height = height, device = device)
+  ggsave(file.path(main_dir, "figures", paste0(name, ".png")), plot, width = width, height = height, dpi = 600)
+  # The Cairo SVG device draws glyphs as outlines (no font substitution in Word).
+  if (capabilities("cairo")) {
+    ggsave(file.path(main_dir, "figures", paste0(name, ".svg")), plot, width = width, height = height,
+           device = function(filename, ...) grDevices::svg(filename = filename, ...))
+  } else {
+    warning("Cairo is unavailable, so ", name, ".svg was not written.")
+  }
 }
 
 # Rows ordered by size within each family (largest at the top).
@@ -452,90 +485,31 @@ figure1 <- wrap_plots(
 save_figure(figure1, "Figure_1_AI_Experiences_and_Topics", 7.2, 5.6)
 
 
-# Figure 2: daily vs less frequent users among daily general AI users,
-# Holm-significant comparisons only (all 21 are in Table S4).
-comparisons <- intensive("Experience_Comparisons")
-n_daily <- unique(comparisons$n_daily)
-n_less <- unique(comparisons$n_less)
-
-figure2_data <- comparisons %>%
-  filter(holm_p < .05) %>%
-  mutate(family = factor(family_labels[family], family_labels), item = short_labels[variable]) %>%
-  order_items(difference_pct) %>%
-  select(family, variable, item, n_daily, pct_daily, n_less, pct_less, holm_p)
-
-group_labels <- c(Daily = paste0("Daily: almost every day or every day (*n* = ", n_daily, ")"),
-                  `Less frequent` = paste0("Less frequent (*n* = ", n_less, ")"))
-x_p <- 114
-
-figure2_row <- function(fam, top, bottom) {
-  d <- droplevels(filter(figure2_data, family == fam))
-  points <- bind_rows(transmute(d, item, group = "Daily", pct = pct_daily, side = sign(pct_daily - pct_less)),
-                      transmute(d, item, group = "Less frequent", pct = pct_less, side = sign(pct_less - pct_daily)))
-  headers <- if (top) {
-    annotate(ggtext::GeomRichText, x = x_p, y = nrow(d) + 0.95, label = "**Holm *p***", hjust = 1, size = 2.6,
-             colour = muted, fill = NA, label.colour = NA, label.padding = unit(0, "pt"))
-  }
-  ggplot(d, aes(y = item)) +
-    geom_segment(aes(x = pct_less, xend = pct_daily, yend = item), colour = "#C9D2D9", linewidth = 2.2, lineend = "round") +
-    geom_point(data = points, aes(x = pct, colour = group, shape = group), size = 2.6) +
-    # Each percentage sits on the outer side of its marker, masking the gridline.
-    geom_label(data = points, aes(x = pct + 2.6 * side, label = paste0(f2(pct, 1), "%"), hjust = (1 - side) / 2),
-               size = 2.6, colour = ink, fill = "white", border.colour = NA, label.padding = unit(0.5, "pt")) +
-    geom_text(aes(x = x_p, label = fp(holm_p)), hjust = 1, size = 2.6, colour = ink) +
-    headers +
-    scale_colour_manual(values = c(Daily = blue, `Less frequent` = orange), labels = group_labels, name = NULL) +
-    scale_shape_manual(values = c(Daily = 16, `Less frequent` = 18), labels = group_labels, name = NULL) +
-    scale_x_continuous(limits = c(-10, x_p), breaks = seq(0, 100, 20), expand = expansion(mult = c(0, 0.01))) +
-    coord_cartesian(clip = "off") +
-    labs(x = if (bottom) "Users reporting the item (%)" else NULL, y = NULL, title = fam) +
-    figure_theme + theme(axis.title.x = element_text(hjust = 0.48)) +
-    (if (bottom) theme() else hide_x) + (if (top) theme() else guides(colour = "none", shape = "none"))
-}
-families2 <- levels(droplevels(figure2_data$family))
-figure2 <- wrap_plots(
-  pmap(list(families2, seq_along(families2) == 1, seq_along(families2) == length(families2)), figure2_row),
-  ncol = 1, heights = as.numeric(table(figure2_data$family)) + 0.9
-) +
-  plot_layout(guides = "collect") +
-  plot_annotation(
-    caption = paste0(
-      "AI emotional-support users with daily general AI use (*n* = ", n_daily + n_less, "). Shown are the ",
-      nrow(figure2_data), " of ", nrow(comparisons), " comparisons significant after Holm correction ",
-      "(*p*<0.05);<br>Table S4 reports all ", nrow(comparisons), "."
-    ),
-    theme = caption_theme
-  ) &
-  theme(legend.position = "bottom", legend.justification = "left", legend.margin = margin(0, 0, 0, 0),
-        legend.text = ggtext::element_markdown(size = 7.5, colour = ink))
-save_figure(figure2, "Figure_2_Intensive_Emotional_Support_Users", 7.2, 4.6)
-
-
-# Figure 3 (post hoc, exploratory): AI emotional-support use by childhood
+# Figure 2 (post hoc, exploratory): AI emotional-support use by childhood
 # adversity (ACE-10 group) within age groups, from 09_ace_by_age.R. The figure
 # is descriptive only; the ACE x age (continuous) interaction test is
 # reported in the Results and remains in Round_B/ACE_by_Age.xlsx.
 ace_cells <- round_b("ACE_by_Age.xlsx", "Cells")
 stopifnot(nrow(ace_cells) == 18, all(ace_cells$n >= 30))
 dash <- function(x) gsub("-", "\u2013", x)
-age_levels3 <- dash(unique(ace_cells$age_group))
-ace_levels3 <- c("0", "1\u20133", "4 or more")
+age_levels2 <- dash(unique(ace_cells$age_group))
+ace_levels2 <- c("0", "1\u20133", "4 or more")
 # Grey, blue, navy: ordered by ACE group, each at least 3:1 against white,
 # and the groups also differ in marker shape.
-ace_palette <- setNames(c("#8A949B", blue, "#173A5E"), ace_levels3)
+ace_palette <- setNames(c("#8A949B", blue, "#173A5E"), ace_levels2)
 
-figure3_data <- ace_cells %>%
-  transmute(age_group = factor(dash(age_group), age_levels3), ace_group = factor(dash(ace_group), ace_levels3),
+figure2_data <- ace_cells %>%
+  transmute(age_group = factor(dash(age_group), age_levels2), ace_group = factor(dash(ace_group), ace_levels2),
             n, users, pct, CI_lower, CI_upper)
-pd3 <- position_dodge(width = 0.45)
+pd2 <- position_dodge(width = 0.45)
 # Space between legend entries: legend.key.spacing.x from ggplot2 3.5,
 # legend.text margins before that.
 key_spacing <- if (packageVersion("ggplot2") >= "3.5.0") theme(legend.key.spacing.x = unit(10, "pt")) else theme()
-figure3 <- ggplot(figure3_data, aes(age_group, pct, colour = ace_group, group = ace_group)) +
-  geom_line(position = pd3, linewidth = 0.6) +
-  geom_errorbar(aes(ymin = CI_lower, ymax = CI_upper), position = pd3, width = 0.18, linewidth = 0.45,
+figure2 <- ggplot(figure2_data, aes(age_group, pct, colour = ace_group, group = ace_group)) +
+  geom_line(position = pd2, linewidth = 0.6) +
+  geom_errorbar(aes(ymin = CI_lower, ymax = CI_upper), position = pd2, width = 0.18, linewidth = 0.45,
                 show.legend = FALSE) +
-  geom_point(aes(shape = ace_group, fill = ace_group), position = pd3, size = 2.4, colour = "white", stroke = 0.5) +
+  geom_point(aes(shape = ace_group, fill = ace_group), position = pd2, size = 2.4, colour = "white", stroke = 0.5) +
   scale_colour_manual(values = ace_palette, name = "ACE-10 score") +
   scale_fill_manual(values = ace_palette, name = "ACE-10 score") +
   scale_shape_manual(values = c(21, 22, 24), name = "ACE-10 score") +
@@ -558,8 +532,67 @@ figure3 <- ggplot(figure3_data, aes(age_group, pct, colour = ace_group, group = 
     ),
     theme = caption_theme
   )
-save_figure(figure3, "Figure_3_ACE_Across_Age_Groups", 7.2, 4.8)
-figure3_data <- mutate(figure3_data, across(c(age_group, ace_group), as.character))
+save_figure(figure2, "Figure_2_ACE_Across_Age_Groups", 7.2, 4.8)
+figure2_data <- mutate(figure2_data, across(c(age_group, ace_group), as.character))
+
+
+# Figure 3: daily vs less frequent users among daily general AI users,
+# Holm-significant comparisons only (all 21 are in Table S4).
+comparisons <- intensive("Experience_Comparisons")
+n_daily <- unique(comparisons$n_daily)
+n_less <- unique(comparisons$n_less)
+
+figure3_data <- comparisons %>%
+  filter(holm_p < .05) %>%
+  mutate(family = factor(family_labels[family], family_labels), item = short_labels[variable]) %>%
+  order_items(difference_pct) %>%
+  select(family, variable, item, n_daily, pct_daily, n_less, pct_less, holm_p)
+
+group_labels <- c(Daily = paste0("Daily: almost every day or every day (*n* = ", n_daily, ")"),
+                  `Less frequent` = paste0("Less frequent (*n* = ", n_less, ")"))
+x_p <- 114
+
+figure3_row <- function(fam, top, bottom) {
+  d <- droplevels(filter(figure3_data, family == fam))
+  points <- bind_rows(transmute(d, item, group = "Daily", pct = pct_daily, side = sign(pct_daily - pct_less)),
+                      transmute(d, item, group = "Less frequent", pct = pct_less, side = sign(pct_less - pct_daily)))
+  headers <- if (top) {
+    annotate(ggtext::GeomRichText, x = x_p, y = nrow(d) + 0.95, label = "**Holm *p***", hjust = 1, size = 2.6,
+             colour = muted, fill = NA, label.colour = NA, label.padding = unit(0, "pt"))
+  }
+  ggplot(d, aes(y = item)) +
+    geom_segment(aes(x = pct_less, xend = pct_daily, yend = item), colour = "#C9D2D9", linewidth = 2.2, lineend = "round") +
+    geom_point(data = points, aes(x = pct, colour = group, shape = group), size = 2.6) +
+    # Each percentage sits on the outer side of its marker, masking the gridline.
+    geom_label(data = points, aes(x = pct + 2.6 * side, label = paste0(f2(pct, 1), "%"), hjust = (1 - side) / 2),
+               size = 2.6, colour = ink, fill = "white", border.colour = NA, label.padding = unit(0.5, "pt")) +
+    geom_text(aes(x = x_p, label = fp(holm_p)), hjust = 1, size = 2.6, colour = ink) +
+    headers +
+    scale_colour_manual(values = c(Daily = blue, `Less frequent` = orange), labels = group_labels, name = NULL) +
+    scale_shape_manual(values = c(Daily = 16, `Less frequent` = 18), labels = group_labels, name = NULL) +
+    scale_x_continuous(limits = c(-10, x_p), breaks = seq(0, 100, 20), expand = expansion(mult = c(0, 0.01))) +
+    coord_cartesian(clip = "off") +
+    labs(x = if (bottom) "Users reporting the item (%)" else NULL, y = NULL, title = fam) +
+    figure_theme + theme(axis.title.x = element_text(hjust = 0.48)) +
+    (if (bottom) theme() else hide_x) + (if (top) theme() else guides(colour = "none", shape = "none"))
+}
+families3 <- levels(droplevels(figure3_data$family))
+figure3 <- wrap_plots(
+  pmap(list(families3, seq_along(families3) == 1, seq_along(families3) == length(families3)), figure3_row),
+  ncol = 1, heights = as.numeric(table(figure3_data$family)) + 0.9
+) +
+  plot_layout(guides = "collect") +
+  plot_annotation(
+    caption = paste0(
+      "Percentages of daily (*n* = ", n_daily, ") and less frequent (*n* = ", n_less, ") emotional-support users. ",
+      "Shown are the ", number_word(nrow(figure3_data)), " of ", nrow(comparisons), "<br>comparisons significant ",
+      "after Holm correction within item families; Table S4 reports all ", nrow(comparisons), "."
+    ),
+    theme = caption_theme
+  ) &
+  theme(legend.position = "bottom", legend.justification = "left", legend.margin = margin(0, 0, 0, 0),
+        legend.text = ggtext::element_markdown(size = 7.5, colour = ink))
+save_figure(figure3, "Figure_3_Intensive_Emotional_Support_Users", 7.2, 4.6)
 
 
 # ---- Table S1: AI experiences among emotional-support users ------
@@ -674,7 +707,7 @@ write_table_doc(
     "emotional-support use but no general AI use. C: excludes participants without an index trauma (scored 0 on ",
     "the PCL-5 in the main analysis). D: raking weights (2022 CBS margins) are unavailable for the nine ",
     "participants reporting other gender; both models use the same sample and the main-analysis standardization. ",
-    "Users = AI emotional-support users. Bold: p < 0.05."
+    "Users = AI emotional-support users. Bold: p < .05."
   )
 )
 
@@ -706,7 +739,7 @@ tableS3_rows <- bind_rows(
                 c("Primary", "Post-secondary non-academic", "Bachelor's degree", "Master's degree or higher")),
   s3_categories("Income (reference: about average)", "income",
                 c("Much below average", "Below average", "Above average", "Much above average")),
-  s3_categories("Sector (reference: Jewish, other or no religion)", "sector", "Arab"),
+  s3_categories("Sector (reference: Jewish, other religion, or no religion)", "sector", "Arab"),
   section_row("Psychological and interpersonal (per SD)", s3_cols),
   s3_or("distress_z", "Psychological distress"),
   s3_or("loneliness_z", "Loneliness"),
@@ -736,7 +769,7 @@ all_term_labels <- c(
   `incomeBelow average` = "Income: below average (vs. about average)",
   `incomeAbove average` = "Income: above average (vs. about average)",
   `incomeMuch above average` = "Income: much above average (vs. about average)",
-  sectorArab = "Sector: Arab (vs. Jewish, other or no religion)",
+  sectorArab = "Sector: Arab (vs. Jewish, other religion, or no religion)",
   term_labels[c("distress_z", "loneliness_z", "social_support_z", "pcl_z", "ace_z", "lec_direct_z", "oct7_z")],
   `general_ai_frequencySeveral times a month` = "General AI use: several times a month (vs. a few times)",
   `general_ai_frequencySeveral times a week` = "General AI use: several times a week (vs. a few times)",
@@ -756,7 +789,7 @@ write_table_doc(
   paste0(
     "n = ", comma(sum(secondary_sample$n)), " participants reporting any general AI use (",
     comma(sum(secondary_sample$users)), " AI emotional-support users). All predictors were entered simultaneously. ",
-    "Bold: p < 0.05."
+    "Bold: p < .05."
   )
 )
 
@@ -817,9 +850,9 @@ write_table_doc(
     " of ", sum(group_sizes$n[group_sizes$daily == 1]), " daily emotional-support users retained). A: adjusted for ",
     "age, gender, and all M5 psychological, interpersonal, and trauma predictors; excludes ",
     check_value("Excluded: gender 'Other' (none daily)"), " users reporting another gender (none daily); ",
-    "c-statistic = ", f2(check_value("c-statistic")), ". B: differences (daily minus less frequent) in percentage ",
+    "c-statistic = ", f2_nz(check_value("c-statistic")), ". B: differences (daily minus less frequent) in percentage ",
     "points (pp) with Wald 95% CIs not adjusted for multiplicity; Fisher's exact p values, Holm-adjusted within ",
-    "item family (helpfulness, 2 items; experiences, 7; topics, 12). Bold: p < 0.05."
+    "item family (helpfulness, 2 items; experiences, 7; topics, 12). Bold: p < .05."
   )
 )
 
@@ -839,7 +872,7 @@ unadjusted_significant <- topic_unadjusted$topic[topic_unadjusted$p_holm < .05]
 
 write_table_doc(
   file.path(supplement_dir, "tables", "Table_S5_War_Exposure_and_Topics.docx"), "Table S5",
-  "War-related exposure and Topics Discussed With AI Among Emotional-Support Users (Exploratory)",
+  "War-Related Exposure and Topics Discussed With AI Among Emotional-Support Users (Exploratory)",
   list(pub_table(tableS5, c(3.0, 1.15, 1.55, 0.7, 0.7), c("left", rep("center", 4)), 9) %>%
          set_header_labels(values = c(Topic = "Topic", Users = "Users discussing\nthe topic, n (%)",
                                       OR = "OR [95% CI]\nper SD", p = "p", Holm_p = "Holm p")) %>%
@@ -850,7 +883,7 @@ write_table_doc(
     "and female gender but not for psychological distress or PTSD symptoms. Holm adjustment is across the 12 topics. ",
     "Without covariates, the same ", if (identical(unadjusted_significant, holm_significant)) "single topic" else "topics",
     " remained significant (", paste(tolower(unadjusted_significant), collapse = ", "),
-    ": Holm p = ", fp(topic_unadjusted$p_holm[topic_unadjusted$p_holm < .05]), "). Bold: Holm p < 0.05."
+    ": Holm p = ", fp(topic_unadjusted$p_holm[topic_unadjusted$p_holm < .05]), "). Bold: Holm p < .05."
   )
 )
 
