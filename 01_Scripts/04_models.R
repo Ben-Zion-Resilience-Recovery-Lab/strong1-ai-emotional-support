@@ -9,7 +9,7 @@
 #   Secondary   M5 + general AI-use frequency among general AI users.
 #   Sensitivity Distress components (M3); without the inconsistent
 #               responders (M3, M5); M5 among participants administered
-#               the PCL-5.
+#               the PCL-5; M5 unweighted vs with raking weights.
 # Output: Models.xlsx.
 
 source("01_Scripts/00_setup.R")
@@ -79,14 +79,27 @@ refit <- function(label, data, terms) {
 }
 consistent <- filter(primary_dat, ai_logic_inconsistent == 0)
 
+# Raking weights are missing for the nine participants of gender "Other",
+# so the unweighted and weighted M5 are compared on the same 3,591; the
+# predictors keep the standardization of the main analysis.
+weighted_dat <- primary_dat %>% filter(!is.na(RakedWeights)) %>% mutate(gender = droplevels(gender))
+weighted_fits <- list(Unweighted = fit_logit(weighted_dat, model_terms$M5),
+                      Weighted = fit_logit(weighted_dat, model_terms$M5, weights = ~RakedWeights))
+
 sensitivity <- bind_rows(
   coefficients %>% filter(model %in% c("M3", "M5"), term %in% focal_terms) %>%
     transmute(check = paste0(model, ", main"), n = nrow(primary_dat),
               events = sum(primary_dat$ai_support_binary), term, OR, CI_lower, CI_upper, p_value),
   refit("M3, inconsistent responders excluded", consistent, model_terms$M3),
   refit("M5, inconsistent responders excluded", consistent, model_terms$M5),
-  refit("M5, administered the PCL-5 only", filter(primary_dat, pcl_routed == 0), model_terms$M5)
+  refit("M5, administered the PCL-5 only", filter(primary_dat, pcl_routed == 0), model_terms$M5),
+  imap_dfr(weighted_fits, ~ mutate(odds_ratios(.x, focal_terms), check = paste0("M5, ", .y), n = nrow(weighted_dat),
+                                    events = sum(weighted_dat$ai_support_binary), .before = 1))
 )
+weighted_tests <- imap_dfr(weighted_fits, ~ mutate(wald_test(.x, blocks$M5, "Trauma exposure (joint)"), fit = .y, .before = 1))
+weighted_coefficients <- imap_dfr(weighted_fits, ~ mutate(odds_ratios(.x), fit = .y, .before = 1))
+w <- weighted_dat$RakedWeights
+weight_summary <- tibble(min = min(w), median = median(w), max = max(w), kish_effective_n = sum(w)^2 / sum(w^2))
 
 write_analysis(
   list(
@@ -99,7 +112,10 @@ write_analysis(
     Components = components,
     Components_Joint_Test = component_joint,
     Components_Correlations = component_correlations,
-    Sensitivity = sensitivity
+    Sensitivity = sensitivity,
+    Weighted_Trauma_Tests = weighted_tests,
+    Weighted_Coefficients = weighted_coefficients,
+    Weight_Summary = weight_summary
   ),
   "Models.xlsx"
 )

@@ -10,14 +10,15 @@
 
 source("01_Scripts/00_setup.R")
 
-values <- read_excel(raw_file, sheet = "T1_Values_200826", guess_max = 10000)
-labels <- read_excel(raw_file, sheet = "T1_Labels_200826", guess_max = 10000)
-screening <- read_excel(raw_file, sheet = "T1_Filtering_200826", guess_max = 10000)
+values <- read_excel(raw_file, sheet = "T1_Values_101126", guess_max = 10000)
+labels <- read_excel(raw_file, sheet = "T1_Labels_101126", guess_max = 10000)
+screening <- read_excel(raw_file, sheet = "T1_Filtering_101126", guess_max = 10000)
 
 source_vars <- c(
-  # Identification, administration and design (TemporaryWeights is a
-  # placeholder of 1s; all analyses are unweighted)
-  "UserID", "UserLanguage", "DurationInMinutes", "TemporaryWeights",
+  # Identification, administration and design. RakedWeights (raked to 2022
+  # CBS margins; missing for gender "Other") are used only in the weighted
+  # sensitivity analysis; all other analyses are unweighted.
+  "UserID", "UserLanguage", "DurationInMinutes", "RakedWeights",
   "Age", "Gender", "Education", "Income", "Religiosity_Q01",
   # AI use; items 03-05 were asked only when MH_AI_Q02 > 0
   "MH_AI_Q01", "MH_AI_Q02", "MH_AI_Q03", q04_items, q05_items,
@@ -95,8 +96,7 @@ participants <- values %>%
     ai_helpfulness = MH_AI_Q03,
 
     ace = ACE_Score,                 # childhood adversity to age 18
-    # Event types that happened to the participant, without items 14-15. The
-    # supplied LEC5_Direct_Score counts all 17 items and is kept for comparison.
+    # Event types that happened to the participant, without items 14-15.
     lec_direct = rowSums(across(all_of(lec_direct_items)) == 1),
     # The STRONG team's 14-item October 7 index, unmodified: evacuation is
     # nested (still displaced scores 2) and one item is relocation during
