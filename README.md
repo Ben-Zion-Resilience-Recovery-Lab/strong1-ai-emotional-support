@@ -25,7 +25,7 @@ The outputs were verified with `officer` 0.7.7 and `flextable` 0.10.3. Each anal
 
 ## Input data
 
-An authorized researcher places the STRONG-1 workbook at `data/STRONG1Data.xlsx`, with the sheets `T1_Values_200826` (responses), `T1_Labels_200826` (response labels) and `T1_Filtering_200826` (central quality-control records). The workbook is only read, never modified.
+An authorized researcher places the STRONG-1 workbook at `data/STRONG1Data.xlsx`, with the sheets `T1_Values_101126` (responses and raking weights), `T1_Labels_101126` (response labels) and `T1_Filtering_101126` (central quality-control records). The workbook is only read, never modified.
 
 `01_prepare_data.R` writes the cleaned analysis dataset `data/STRONG1_T1_analysis_data.rds`, the only data source of the later scripts. It holds the 3,602 retained participants with every item and supplied score of the questionnaires analyzed (PHQ-9, GAD-7, PSS-10, UCLA-3, mMOS-SS, PCL-5 with its routing item, ACE-10, LEC-5, the October 7 exposure items and the study's AI items), the demographic, administration and design variables, and the derived analysis variables; plus the 4,979 central QC records and the response labels of the coded items.
 
@@ -56,10 +56,10 @@ Each script runs in its own R process, in order, and the pipeline stops at the f
 
 ## Analysis notes
 
-- All estimates are unweighted (`TemporaryWeights` is a placeholder of 1s). Models are logistic regressions fitted with `survey::svyglm` on an equal-probability design, giving design-based standard errors and Wald tests. Age is per year; other continuous predictors are per sample SD.
+- All estimates are unweighted except one sensitivity analysis, which repeats M5 with the STRONG `RakedWeights` (raked to 2022 CBS margins) on the 3,591 model-sample participants who have weights (missing for the nine reporting gender "Other"), alongside the unweighted M5 on the same participants (Table S2, Panel D). Models are logistic regressions fitted with `survey::svyglm` on an equal-probability design, giving design-based standard errors and Wald tests. Age is per year; other continuous predictors are per sample SD.
 - The models use the 3,600 complete cases; the two excluded participants lack only a loneliness score (UCLA-3 not computable).
 - The 533 participants who reported no index trauma were routed past the PCL-5 and are scored 0 (532 in the model sample); a sensitivity analysis excludes them.
-- LEC-5 direct exposure (0–15) is calculated from the items: "Happened to me" responses (code 1) on items 1–13 and 16–17. Items 14–15 (sudden violent death; in the administered Hebrew and Arabic versions, sudden unexpected death of a close person) are classified as indirect for every response; "Not sure" and "Did not happen to me" are non-exposure. The supplied `LEC5_Direct_Score` counts all 17 items and is retained only for comparison in `Data_Checks.xlsx`.
+- LEC-5 direct exposure (0–15) is calculated from the items: "Happened to me" responses (code 1) on items 1–13 and 16–17. Items 14–15 (sudden violent death; in the administered Hebrew and Arabic versions, sudden unexpected death of a close person) are classified as indirect for every response; "Not sure" and "Did not happen to me" are non-exposure.
 - Sector (M1 covariate) is coded Arab (Muslim, Christian or Druze; 210 retained, 209 in the model sample) versus a comparison group of Jewish, other religion and no religion (3,392; 3,391). Participants reporting another religion or no religion (32) were in the non-Jewish group before 9 November 2026.
 - The October 7 and war-related exposure index is the STRONG team's 14-item count, including relocation during the Iran war.
 

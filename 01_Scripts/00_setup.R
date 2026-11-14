@@ -54,13 +54,11 @@ item_labels <- setNames(c(
 
 # All models are logistic regressions fitted with svyglm on an
 # equal-probability design: unweighted estimates with design-based
-# (robust) standard errors and Wald tests.
-fit_logit <- function(data, terms, outcome = "ai_support_binary") {
-  svyglm(
-    reformulate(terms, response = outcome),
-    design = svydesign(ids = ~1, probs = ~1, data = data),
-    family = quasibinomial()
-  )
+# (robust) standard errors and Wald tests. `weights` (a formula) gives the
+# weighted sensitivity analysis.
+fit_logit <- function(data, terms, outcome = "ai_support_binary", weights = NULL) {
+  design <- if (is.null(weights)) svydesign(ids = ~1, probs = ~1, data = data) else svydesign(ids = ~1, weights = weights, data = data)
+  svyglm(reformulate(terms, response = outcome), design = design, family = quasibinomial())
 }
 
 # Odds ratios with Wald 95% CIs (all non-intercept terms unless `terms`

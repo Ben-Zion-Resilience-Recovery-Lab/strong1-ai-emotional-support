@@ -615,27 +615,41 @@ s2a <- bind_rows(
          OR = f_wald(component_joint$F, component_joint$df_num, component_joint$df_den),
          p = fp(component_joint$p_value), p_value = component_joint$p_value)
 )
-b3 <- sensitivity_check("M3, inconsistent responders excluded")
-b5 <- sensitivity_check("M5, inconsistent responders excluded")
-s2b <- tibble(Predictor = b5$Predictor) %>%
-  left_join(select(b3, Predictor, M3_OR = OR, M3_p = p, M3_p_value = p_value), by = "Predictor") %>%
-  left_join(select(b5, Predictor, M5_OR = OR, M5_p = p, M5_p_value = p_value), by = "Predictor") %>%
-  mutate(across(c(M3_OR, M3_p), ~ coalesce(.x, "")))
+# Two models side by side, rows in the order of the second; columns
+# <model>_OR, <model>_p and <model>_p_value.
+pair_models <- function(first, second, names) {
+  side <- function(d, m) setNames(select(d, Predictor, OR, p, p_value), c("Predictor", paste0(m, c("_OR", "_p", "_p_value"))))
+  tibble(Predictor = second$Predictor) %>%
+    left_join(side(first, names[1]), by = "Predictor") %>%
+    left_join(side(second, names[2]), by = "Predictor") %>%
+    mutate(across(paste0(names[1], c("_OR", "_p")), ~ coalesce(.x, "")))
+}
+s2b <- pair_models(sensitivity_check("M3, inconsistent responders excluded"),
+                   sensitivity_check("M5, inconsistent responders excluded"), c("M3", "M5"))
 s2c <- sensitivity_check("M5, administered the PCL-5 only")
+weighted_tests <- mod("Weighted_Trauma_Tests")
+with_joint_test <- function(d, fit) {
+  t <- filter(weighted_tests, fit == !!fit)
+  bind_rows(d, tibble(Predictor = "Trauma exposure, joint test", OR = f_wald(t$F, t$df_num, t$df_den),
+                      p = fp(t$p_value), p_value = t$p_value))
+}
+s2d <- pair_models(with_joint_test(sensitivity_check("M5, Unweighted"), "Unweighted"),
+                   with_joint_test(sensitivity_check("M5, Weighted"), "Weighted"), c("Unweighted", "Weighted"))
 
 s2_table <- function(d, widths) {
   pub_table(select(d, Predictor, OR, p), widths, c("left", "center", "center"), 9) %>%
     set_header_labels(values = c(Predictor = "Predictor (per SD)", OR = "OR [95% CI]", p = "p")) %>%
     bold_p(3, d$p_value)
 }
-s2b_ft <- pub_table(select(s2b, Predictor, M3_OR, M3_p, M5_OR, M5_p), c(3.0, 1.45, 0.6, 1.45, 0.6),
-                    c("left", rep("center", 4)), 9) %>%
-  set_header_labels(values = c(Predictor = "Predictor (per SD)", M3_OR = "OR [95% CI]", M3_p = "p",
-                               M5_OR = "OR [95% CI]", M5_p = "p")) %>%
-  add_header_row(values = c("", "M3", "M5"), colwidths = c(1, 2, 2)) %>%
-  hline(i = 1, j = 2:5, border = fp_border(width = 0.75), part = "header") %>%
-  bold_p(3, s2b$M3_p_value) %>%
-  bold_p(5, s2b$M5_p_value)
+s2_pair_table <- function(d, names, header = names) {
+  cols <- c("Predictor", paste0(rep(names, each = 2), c("_OR", "_p")))
+  pub_table(d[cols], c(3.0, 1.45, 0.6, 1.45, 0.6), c("left", rep("center", 4)), 9) %>%
+    set_header_labels(values = setNames(c("Predictor (per SD)", rep(c("OR [95% CI]", "p"), 2)), cols)) %>%
+    add_header_row(values = c("", header), colwidths = c(1, 2, 2)) %>%
+    hline(i = 1, j = 2:5, border = fp_border(width = 0.75), part = "header") %>%
+    bold_p(3, d[[paste0(names[1], "_p_value")]]) %>%
+    bold_p(5, d[[paste0(names[2], "_p_value")]])
+}
 
 n_pcl_excluded <- unique(sensitivity$n[sensitivity$check == "M5, main"]) -
   unique(sensitivity$n[sensitivity$check == "M5, administered the PCL-5 only"])
@@ -644,19 +658,23 @@ write_table_doc(
   file.path(supplement_dir, "tables", "Table_S2_Sensitivity_Analyses.docx"), "Table S2",
   "Sensitivity Analyses for the Hierarchical Logistic Regression",
   setNames(
-    list(s2_table(s2a, c(4.3, 2.0, 0.8)), s2b_ft, s2_table(s2c, c(4.3, 2.0, 0.8))),
+    list(s2_table(s2a, c(4.3, 2.0, 0.8)), s2_pair_table(s2b, c("M3", "M5")), s2_table(s2c, c(4.3, 2.0, 0.8)),
+         s2_pair_table(s2d, c("Unweighted", "Weighted"))),
     c(paste0("A. Distress components entered separately (M3; ", sample_note("M3, main"), ")"),
       paste0("B. Excluding ", comma(unique(sensitivity$n[sensitivity$check == "M3, main"]) -
                                       unique(sensitivity$n[sensitivity$check == "M3, inconsistent responders excluded"])),
              " logically inconsistent responders (", sample_note("M3, inconsistent responders excluded"), ")"),
       paste0("C. Excluding ", comma(n_pcl_excluded), " participants routed past the PCL-5 (M5; ",
-             sample_note("M5, administered the PCL-5 only"), ")"))
+             sample_note("M5, administered the PCL-5 only"), ")"),
+      paste0("D. Unweighted and weighted M5 (", sample_note("M5, Weighted"), ")"))
   ),
   paste0(
     "Adjusted ORs per SD with 95% CIs; each model includes all covariates of the indicated hierarchical step. ",
     "A: PHQ-9, GAD-7, and PSS-10 replace the distress composite. B: excludes respondents reporting AI ",
     "emotional-support use but no general AI use. C: excludes participants without an index trauma (scored 0 on ",
-    "the PCL-5 in the main analysis). Users = AI emotional-support users. Bold: p < 0.05."
+    "the PCL-5 in the main analysis). D: raking weights (2022 CBS margins) are unavailable for the nine ",
+    "participants reporting other gender; both models use the same sample and the main-analysis standardization. ",
+    "Users = AI emotional-support users. Bold: p < 0.05."
   )
 )
 
@@ -844,6 +862,7 @@ write_xlsx(list(Table_1 = table1, Table_2 = table2, Figure_1_Data = figure1_data
            file.path(main_dir, "source_data", "MAIN_Results_Tables.xlsx"))
 write_xlsx(list(Table_S1 = tableS1, Table_S2_A = select(s2a, -p_value),
                 Table_S2_B = select(s2b, -ends_with("p_value")), Table_S2_C = select(s2c, -p_value),
+                Table_S2_D = select(s2d, -ends_with("p_value")),
                 Table_S3 = tableS3, Table_S3_All_Terms = tableS3_all, Table_S4_A = select(s4a, -p_value), Table_S4_B = s4b,
                 Table_S5 = tableS5),
            file.path(supplement_dir, "source_data", "SUPPLEMENT_Results_Tables.xlsx"))
