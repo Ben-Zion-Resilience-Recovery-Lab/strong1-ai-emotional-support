@@ -18,7 +18,7 @@ mod <- function(sheet) read_result("Models.xlsx", sheet)
 intensive <- function(sheet) read_result("Intensive_Users.xlsx", sheet)
 round_b <- function(file, sheet) read_result(file.path("Round_B", file), sheet)
 
-for (d in c(file.path(main_dir, c("tables", "figures/previews", "source_data")),
+for (d in c(file.path(main_dir, c("tables", "figures", "source_data")),
             file.path(supplement_dir, c("tables", "source_data")))) {
   dir.create(d, showWarnings = FALSE, recursive = TRUE)
 }
@@ -82,8 +82,8 @@ pub_table <- function(data, widths, align, size, row_type = NULL, group_span = l
     set_table_properties(layout = "fixed", width = 1, align = "center",
                          opts_word = list(split = FALSE, keep_with_next = TRUE)) %>%
     width(j = seq_along(widths), width = widths) %>%
-    # Row height follows the text. flextable's default 0.25 in row height is written as
-    # w:trHeight, which some renderers (e.g., LibreOffice) treat as a minimum.
+    # Rows are as tall as their text: flextable's default 0.25 in row height
+    # would otherwise act as a minimum in some renderers.
     height_all(height = 0.01, part = "all") %>%
     hrule(rule = "auto", part = "all")
   for (j in seq_along(align)) ft <- align(ft, j = j, align = align[j], part = "body")
@@ -324,28 +324,36 @@ t2_row <- function(term, label, type = "regular", digits = 2) {
          !!!setNames(as.list(c(rbind(or, p))), t2_cols[-1]),
          !!!setNames(as.list(r$p_value), paste0(model_names, "_pvalue")))
 }
-t2_categories <- function(heading, prefix, levels) {
-  bind_rows(group_row(heading, t2_cols), map_dfr(levels, ~ t2_row(paste0(prefix, .x), .x, "category")))
+
+# Predictor rows shared by Table 2 and Table S3 (the M5 terms). `row` builds
+# one row from a model term: row(term, label, type, digits).
+predictor_rows <- function(row, cols) {
+  categories <- function(heading, prefix, levels) {
+    bind_rows(group_row(heading, cols), map_dfr(levels, ~ row(paste0(prefix, .x), .x, "category")))
+  }
+  bind_rows(
+    section_row("Demographic covariates", cols),
+    row("age", "Age (years)", digits = 3),
+    categories("Gender (reference: female)", "gender", c("Male", "Other")),
+    categories("Education (reference: secondary)", "education",
+               c("Primary", "Post-secondary non-academic", "Bachelor's degree", "Master's degree or higher")),
+    categories("Income (reference: about average)", "income",
+               c("Much below average", "Below average", "Above average", "Much above average")),
+    categories("Sector (reference: Jewish, other religion, or no religion)", "sector", "Arab"),
+    section_row("Psychological and interpersonal (per SD)", cols),
+    row("distress_z", "Psychological distress"),
+    row("loneliness_z", "Loneliness"),
+    row("social_support_z", "Perceived social support"),
+    section_row("PTSD symptoms and trauma exposure (per SD)", cols),
+    row("pcl_z", "PTSD symptoms (PCL-5)"),
+    row("ace_z", "Childhood adversity (ACE-10)"),
+    row("lec_direct_z", "Direct trauma exposure (LEC-5)"),
+    row("oct7_z", oct7_label)
+  )
 }
 
 table2_rows <- bind_rows(
-  section_row("Demographic covariates", t2_cols),
-  t2_row("age", "Age (years)", digits = 3),
-  t2_categories("Gender (reference: female)", "gender", c("Male", "Other")),
-  t2_categories("Education (reference: secondary)", "education",
-                c("Primary", "Post-secondary non-academic", "Bachelor's degree", "Master's degree or higher")),
-  t2_categories("Income (reference: about average)", "income",
-                c("Much below average", "Below average", "Above average", "Much above average")),
-  t2_categories("Sector (reference: Jewish, other religion, or no religion)", "sector", "Arab"),
-  section_row("Psychological and interpersonal (per SD)", t2_cols),
-  t2_row("distress_z", "Psychological distress"),
-  t2_row("loneliness_z", "Loneliness"),
-  t2_row("social_support_z", "Perceived social support"),
-  section_row("PTSD symptoms and trauma exposure (per SD)", t2_cols),
-  t2_row("pcl_z", "PTSD symptoms (PCL-5)"),
-  t2_row("ace_z", "Childhood adversity (ACE-10)"),
-  t2_row("lec_direct_z", "Direct trauma exposure (LEC-5)"),
-  t2_row("oct7_z", oct7_label),
+  predictor_rows(t2_row, t2_cols),
   section_row("Model", t2_cols),
   tibble(row_type = "block", Predictor = "Block test (Wald F)",
          !!!setNames(as.list(c(rbind(f_wald(block_tests$F, block_tests$df_num, block_tests$df_den),
@@ -424,25 +432,17 @@ hide_x <- theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
 
 # Each figure is written at its publication size (width and height in inches):
 #   <name>.pdf  vector, fonts embedded: the file for the journal;
-#   <name>.svg  vector, text converted to outlines so it cannot be re-fonted:
-#               the file for Word (Insert > Pictures), which renders it sharp on
-#               screen, in PDF export and in print;
-#   <name>.png  600 dpi raster at the same size: Word's fallback for the SVG and
-#               for programs that cannot read SVG;
-#   previews/<name>.png  unchanged 600 dpi preview.
+#   <name>.png  600 dpi raster at the same size: the file for Word.
 save_figure <- function(plot, name, width, height) {
-  ggsave(file.path(main_dir, "figures", "previews", paste0(name, ".png")), plot, width = width, height = height, dpi = 600)
+  path <- file.path(main_dir, "figures", name)
   # Quartz (macOS) and Cairo both embed fonts in the PDF.
-  device <- if (capabilities("aqua")) function(filename, ...) grDevices::quartz(file = filename, type = "pdf", ...) else grDevices::cairo_pdf
-  ggsave(file.path(main_dir, "figures", paste0(name, ".pdf")), plot, width = width, height = height, device = device)
-  ggsave(file.path(main_dir, "figures", paste0(name, ".png")), plot, width = width, height = height, dpi = 600)
-  # The Cairo SVG device draws glyphs as outlines (no font substitution in Word).
-  if (capabilities("cairo")) {
-    ggsave(file.path(main_dir, "figures", paste0(name, ".svg")), plot, width = width, height = height,
-           device = function(filename, ...) grDevices::svg(filename = filename, ...))
+  pdf_device <- if (capabilities("aqua")) {
+    function(filename, ...) grDevices::quartz(file = filename, type = "pdf", ...)
   } else {
-    warning("Cairo is unavailable, so ", name, ".svg was not written.")
+    grDevices::cairo_pdf
   }
+  ggsave(paste0(path, ".pdf"), plot, width = width, height = height, device = pdf_device)
+  ggsave(paste0(path, ".png"), plot, width = width, height = height, dpi = 600)
 }
 
 # Rows ordered by size within each family (largest at the top).
@@ -533,7 +533,6 @@ figure2 <- ggplot(figure2_data, aes(age_group, pct, colour = ace_group, group = 
     theme = caption_theme
   )
 save_figure(figure2, "Figure_2_ACE_Across_Age_Groups", 7.2, 4.8)
-figure2_data <- mutate(figure2_data, across(c(age_group, ace_group), as.character))
 
 
 # Figure 3: daily vs less frequent users among daily general AI users,
@@ -636,10 +635,11 @@ sensitivity_check <- function(check) {
   d <- d[match(intersect(names(term_labels), d$term), d$term), ]
   bind_cols(Predictor = term_labels[d$term], or_cells(d))
 }
+check_n <- function(check) unique(sensitivity$n[sensitivity$check == check])
 sample_note <- function(check) {
   d <- filter(sensitivity, check == !!check)
-  paste0(if (unique(d$n) == unique(sensitivity$n[sensitivity$check == "M3, main"])) "N" else "n",
-         " = ", comma(unique(d$n)), "; ", comma(unique(d$events)), " users")
+  paste0(if (check_n(check) == check_n("M3, main")) "N" else "n", " = ", comma(check_n(check)), "; ",
+         comma(unique(d$events)), " users")
 }
 
 s2a <- bind_rows(
@@ -684,9 +684,6 @@ s2_pair_table <- function(d, names, header = names) {
     bold_p(5, d[[paste0(names[2], "_p_value")]])
 }
 
-n_pcl_excluded <- unique(sensitivity$n[sensitivity$check == "M5, main"]) -
-  unique(sensitivity$n[sensitivity$check == "M5, administered the PCL-5 only"])
-
 write_table_doc(
   file.path(supplement_dir, "tables", "Table_S2_Sensitivity_Analyses.docx"), "Table S2",
   "Sensitivity Analyses for the Hierarchical Logistic Regression",
@@ -694,10 +691,10 @@ write_table_doc(
     list(s2_table(s2a, c(4.3, 2.0, 0.8)), s2_pair_table(s2b, c("M3", "M5")), s2_table(s2c, c(4.3, 2.0, 0.8)),
          s2_pair_table(s2d, c("Unweighted", "Weighted"))),
     c(paste0("A. Distress components entered separately (M3; ", sample_note("M3, main"), ")"),
-      paste0("B. Excluding ", comma(unique(sensitivity$n[sensitivity$check == "M3, main"]) -
-                                      unique(sensitivity$n[sensitivity$check == "M3, inconsistent responders excluded"])),
+      paste0("B. Excluding ", comma(check_n("M3, main") - check_n("M3, inconsistent responders excluded")),
              " logically inconsistent responders (", sample_note("M3, inconsistent responders excluded"), ")"),
-      paste0("C. Excluding ", comma(n_pcl_excluded), " participants routed past the PCL-5 (M5; ",
+      paste0("C. Excluding ", comma(check_n("M5, main") - check_n("M5, administered the PCL-5 only")),
+             " participants routed past the PCL-5 (M5; ",
              sample_note("M5, administered the PCL-5 only"), ")"),
       paste0("D. Unweighted and weighted M5 (", sample_note("M5, Weighted"), ")"))
   ),
@@ -723,32 +720,13 @@ s3_or <- function(term, label, type = "regular", digits = 2) {
   tibble(row_type = type, Predictor = label, Estimate = f_or(r$OR, r$CI_lower, r$CI_upper, digits),
          p = fp(r$p_value), p_value = r$p_value)
 }
-s3_categories <- function(heading, prefix, levels) {
-  bind_rows(group_row(heading, s3_cols), map_dfr(levels, ~ s3_or(paste0(prefix, .x), .x, "category")))
-}
 s3_wald <- function(test, label) {
   r <- secondary_tests[secondary_tests$test == test, ]
   tibble(row_type = "regular", Predictor = label, Estimate = f_wald(r$F, r$df_num, r$df_den),
          p = fp(r$p_value), p_value = r$p_value)
 }
 tableS3_rows <- bind_rows(
-  section_row("Demographic covariates", s3_cols),
-  s3_or("age", "Age (years)", digits = 3),
-  s3_categories("Gender (reference: female)", "gender", c("Male", "Other")),
-  s3_categories("Education (reference: secondary)", "education",
-                c("Primary", "Post-secondary non-academic", "Bachelor's degree", "Master's degree or higher")),
-  s3_categories("Income (reference: about average)", "income",
-                c("Much below average", "Below average", "Above average", "Much above average")),
-  s3_categories("Sector (reference: Jewish, other religion, or no religion)", "sector", "Arab"),
-  section_row("Psychological and interpersonal (per SD)", s3_cols),
-  s3_or("distress_z", "Psychological distress"),
-  s3_or("loneliness_z", "Loneliness"),
-  s3_or("social_support_z", "Perceived social support"),
-  section_row("PTSD symptoms and trauma exposure (per SD)", s3_cols),
-  s3_or("pcl_z", "PTSD symptoms (PCL-5)"),
-  s3_or("ace_z", "Childhood adversity (ACE-10)"),
-  s3_or("lec_direct_z", "Direct trauma exposure (LEC-5)"),
-  s3_or("oct7_z", oct7_label),
+  predictor_rows(s3_or, s3_cols),
   s3_wald("Trauma exposure (joint)", "Trauma exposure indices, joint test"),
   section_row("General AI use (reference: a few times)", s3_cols),
   s3_wald("General AI-use frequency", "Overall test"),
@@ -797,8 +775,8 @@ write_table_doc(
 # ---- Table S4: intensive emotional-support users -----------------
 
 intensive_model <- intensive("Model")
-check <- intensive("Model_Check")
-check_value <- function(item) check$value[check$item == item]
+model_check <- intensive("Model_Check")
+check_value <- function(item) model_check$value[model_check$item == item]
 group_sizes <- intensive("Group_Sizes")
 
 intensive_joint <- intensive("Model_Joint_Test")
