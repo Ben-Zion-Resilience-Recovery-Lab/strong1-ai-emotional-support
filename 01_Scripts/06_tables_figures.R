@@ -858,7 +858,7 @@ write_table_doc(
   paste0(
     "n = ", comma(unique(topic_primary$n)), " AI emotional-support users. Each row is a separate logistic regression ",
     "of the topic on the war-related exposure index (per SD of the retained sample), adjusted for age ",
-    "and female gender but not for psychological distress or PTSD symptoms. Holm adjustment is across the 12 topics. ",
+    "and female gender (female vs. male or other) but not for psychological distress or PTSD symptoms. Holm adjustment is across the 12 topics. ",
     "Without covariates, the same ", if (identical(unadjusted_significant, holm_significant)) "single topic" else "topics",
     " remained significant (", paste(tolower(unadjusted_significant), collapse = ", "),
     ": Holm p = ", fp(topic_unadjusted$p_holm[topic_unadjusted$p_holm < .05]), "). Bold: Holm p < .05."
