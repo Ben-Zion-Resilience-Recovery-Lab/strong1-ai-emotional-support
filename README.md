@@ -69,7 +69,7 @@ Each script runs in its own R process, in order, and the pipeline stops at the f
 | --- | --- |
 | `02_Analysis_Outputs/` | Aggregate analysis workbooks, with every reported estimate |
 | `03_Main_Outputs/tables/` | Table 1 (participant characteristics, with user vs non-user tests), Table 2 (hierarchical models) |
-| `03_Main_Outputs/figures/` | Figure 1 (experiences and topics), Figure 2 (daily vs less frequent users), Figure 3 (AI emotional-support use by ACE group across age groups, descriptive; post hoc); PNG previews in `previews/` |
+| `03_Main_Outputs/figures/` | Figure 1 (experiences and topics), Figure 2 (AI emotional-support use by ACE group across age groups, descriptive; post hoc), Figure 3 (daily vs less frequent emotional-support users among daily general AI users), each as a vector PDF (for the journal) and a 600 dpi PNG (for Word) at publication size |
 | `04_Supplement/tables/` | Tables S1 (AI experiences), S2 (sensitivity), S3 (general AI users), S4 (intensive users), S5 (war-related exposure and topics; post hoc) |
 | `*/source_data/` | Formatted table contents and figure data, including every coefficient of the Table S3 model |
 
